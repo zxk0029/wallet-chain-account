@@ -28,8 +28,10 @@ const (
 )
 
 type TransactionList struct {
-	To   string `json:"to"`
-	Hash string `json:"hash"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Hash   string `json:"hash"`
+	Amount big.Int
 }
 
 type RpcBlock struct {
