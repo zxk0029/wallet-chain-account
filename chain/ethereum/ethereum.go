@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -58,6 +59,87 @@ func (c ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.V
 	return nil, nil
 }
 
+func (c ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
+	// return latest block
+	var blockNumber *big.Int
+	if req.Height == 0 {
+		blockNumber = nil // return latest block
+	} else {
+		blockNumber = big.NewInt(req.Height) // return special block by number
+	}
+	blockInfo, err := c.ethClient.BlockHeaderByNumber(blockNumber)
+	if err != nil {
+		log.Error("get latest block header fail", "err", err)
+		return &account.BlockHeaderResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get latest block header fail",
+		}, nil
+	}
+	return &account.BlockHeaderResponse{
+		Code:             common2.ReturnCode_SUCCESS,
+		Msg:              "get latest block header success",
+		ParentHash:       blockInfo.ParentHash.String(),
+		UncleHash:        blockInfo.UncleHash.String(),
+		CoinBase:         blockInfo.Coinbase.String(),
+		Root:             blockInfo.Root.String(),
+		TxHash:           blockInfo.TxHash.String(),
+		ReceiptHash:      blockInfo.ReceiptHash.String(),
+		ParentBeaconRoot: blockInfo.ParentBeaconRoot.String(),
+		Difficulty:       blockInfo.Difficulty.String(),
+		Number:           blockInfo.Number.String(),
+		GasLimit:         blockInfo.GasLimit,
+		GasUsed:          blockInfo.GasUsed,
+		Time:             blockInfo.Time,
+		Extra:            string(blockInfo.Extra),
+		MixDigest:        blockInfo.MixDigest.String(),
+		Nonce:            strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
+		BaseFee:          blockInfo.BaseFee.String(),
+		WithdrawalsHash:  blockInfo.WithdrawalsHash.String(),
+		BlobGasUsed:      *blockInfo.BlobGasUsed,
+		ExcessBlobGas:    *blockInfo.ExcessBlobGas,
+	}, nil
+}
+
+func (c ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
+	var blockHash common.Hash
+	if req.Hash == "" {
+		blockHash = common.Hash{}
+	} else {
+		blockHash = common.HexToHash(req.Hash)
+	}
+	blockInfo, err := c.ethClient.BlockHeaderByHash(blockHash)
+	if err != nil {
+		log.Error("get latest block header fail", "err", err)
+		return &account.BlockHeaderResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get latest block header fail",
+		}, nil
+	}
+	return &account.BlockHeaderResponse{
+		Code:             common2.ReturnCode_SUCCESS,
+		Msg:              "get latest block header success",
+		ParentHash:       blockInfo.ParentHash.String(),
+		UncleHash:        blockInfo.UncleHash.String(),
+		CoinBase:         blockInfo.Coinbase.String(),
+		Root:             blockInfo.Root.String(),
+		TxHash:           blockInfo.TxHash.String(),
+		ReceiptHash:      blockInfo.ReceiptHash.String(),
+		ParentBeaconRoot: blockInfo.ParentBeaconRoot.String(),
+		Difficulty:       blockInfo.Difficulty.String(),
+		Number:           blockInfo.Number.String(),
+		GasLimit:         blockInfo.GasLimit,
+		GasUsed:          blockInfo.GasUsed,
+		Time:             blockInfo.Time,
+		Extra:            string(blockInfo.Extra),
+		MixDigest:        blockInfo.MixDigest.String(),
+		Nonce:            strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
+		BaseFee:          blockInfo.BaseFee.String(),
+		WithdrawalsHash:  blockInfo.WithdrawalsHash.String(),
+		BlobGasUsed:      *blockInfo.BlobGasUsed,
+		ExcessBlobGas:    *blockInfo.ExcessBlobGas,
+	}, nil
+}
+
 func (c ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
 	block, err := c.ethClient.BlockByNumber(big.NewInt(req.Height))
 	if err != nil {
@@ -90,23 +172,60 @@ func (c ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accoun
 }
 
 func (c ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	block, err := c.ethClient.BlockByHash(common.HexToHash(req.Hash))
+	if err != nil {
+		log.Error("block by number error", err)
+		return &account.BlockResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "block by number error",
+		}, nil
+	}
+	var txListRet []*account.BlockInfoTransactionList
+	for _, v := range block.Transactions {
+		bitlItem := &account.BlockInfoTransactionList{
+			From:   "0x000",
+			To:     v.To,
+			Hash:   v.Hash,
+			Time:   "0",
+			Amount: "10",
+			Fee:    "0",
+			Status: "1",
+		}
+		txListRet = append(txListRet, bitlItem)
+	}
+	return &account.BlockResponse{
+		Code:         common2.ReturnCode_SUCCESS,
+		Msg:          "block by number success",
+		Hash:         block.Hash.String(),
+		BaseFee:      block.BaseFee,
+		Transactions: txListRet,
+	}, nil
 }
 
 func (c ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	nonceResult, err := c.ethClient.TxCountByAddress(common.HexToAddress(req.Address))
+	if err != nil {
+		log.Error("get nonce by address fail", "err", err)
+		return &account.AccountResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get nonce by address fail",
+		}, nil
+	}
+	balanceResult, err := c.ethDataClient.GetBalanceByAddress(req.ContractAddress, req.Address)
+	if err != nil {
+		return &account.AccountResponse{
+			Code:    common2.ReturnCode_ERROR,
+			Msg:     "get token balance fail",
+			Balance: "0",
+		}, err
+	}
+	return &account.AccountResponse{
+		Code:          common2.ReturnCode_SUCCESS,
+		Msg:           "get account response success",
+		AccountNumber: "0",
+		Sequence:      nonceResult.String(),
+		Balance:       balanceResult.BalanceStr,
+	}, nil
 }
 
 func (c ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {

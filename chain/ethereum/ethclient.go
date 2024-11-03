@@ -42,6 +42,7 @@ type EthClient interface {
 	BlockHeaderByNumber(*big.Int) (*types.Header, error)
 
 	BlockByNumber(*big.Int) (*RpcBlock, error)
+	BlockByHash(common.Hash) (*RpcBlock, error)
 
 	LatestSafeBlockHeader() (*types.Header, error)
 	LatestFinalizedBlockHeader() (*types.Header, error)
@@ -149,6 +150,21 @@ func (c *clnt) BlockByNumber(number *big.Int) (*RpcBlock, error) {
 	err := c.rpc.CallContext(ctxwt, &block, "eth_getBlockByNumber", toBlockNumArg(number), true)
 	if err != nil {
 		log.Error("Call eth_getBlockByNumber method fail", "err", err)
+		return nil, err
+	} else if block == nil {
+		log.Warn("header not found")
+		return nil, ethereum.NotFound
+	}
+	return block, nil
+}
+
+func (c *clnt) BlockByHash(hash common.Hash) (*RpcBlock, error) {
+	ctxwt, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
+	defer cancel()
+	var block *RpcBlock
+	err := c.rpc.CallContext(ctxwt, &block, "eth_getBlockByHash", hash, true)
+	if err != nil {
+		log.Error("Call eth_getBlockByHash method fail", "err", err)
 		return nil, err
 	} else if block == nil {
 		log.Warn("header not found")
