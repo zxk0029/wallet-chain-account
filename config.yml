@@ -3,7 +3,7 @@ server:
 
 network: mainnet
 
-chains: [Ethereum]
+chains: [Ethereum,Cosmos]
 
 wallet_node:
   eth:
@@ -14,4 +14,11 @@ wallet_node:
     data_api_key: 'HZEZGEPJJDA633N421AYW9NE8JFNZZC7JT'
     data_api_token: ''
     time_out: 100
-
+  cosmos:
+    rpcs:
+      - rpc_url: 'https://cosmos-rpc.publicnode.com:443'
+    confirmations: 4
+    data_api_url: 'https://api.etherscan.io/api?'
+    data_api_key: 'HZEZGEPJJDA633N421AYW9NE8JFNZZC7JT'
+    data_api_token: ''
+    time_out: 100
