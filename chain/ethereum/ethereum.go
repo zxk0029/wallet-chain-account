@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/keycard-go/hexutils"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/status-im/keycard-go/hexutils"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
