@@ -69,7 +69,6 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
-	// return latest block
 	var blockNumber *big.Int
 	if req.Height == 0 {
 		blockNumber = nil // return latest block
