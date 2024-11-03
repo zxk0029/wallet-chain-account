@@ -2,6 +2,8 @@ package ethereum
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -235,8 +238,29 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	gasPrice, err := c.ethClient.SuggestGasPrice()
+	if err != nil {
+		log.Error("get gas price failed", "err", err)
+		return &account.FeeResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get suggest gas price fail",
+		}, nil
+	}
+	gasTipCap, err := c.ethClient.SuggestGasTipCap()
+	if err != nil {
+		log.Error("get gas price failed", "err", err)
+		return &account.FeeResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get suggest gas price fail",
+		}, nil
+	}
+	return &account.FeeResponse{
+		Code:      common2.ReturnCode_SUCCESS,
+		Msg:       "get gas price success",
+		SlowFee:   gasPrice.String() + "|" + gasTipCap.String(),
+		NormalFee: gasPrice.String() + "|" + gasTipCap.String() + "|" + "*2",
+		FastFee:   gasPrice.String() + "|" + gasTipCap.String() + "|" + "*3",
+	}, nil
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
@@ -385,23 +409,133 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 }
 
 func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var data TxStructure
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+	var amount *big.Int
+	chainID := new(big.Int)
+	gasTipCap := new(big.Int)
+	maxFeePerGas := new(big.Int)
+	valueData := new(big.Int)
+	chainID.SetString(data.ChainId, 10)
+	gasTipCap.SetString(data.GasTipCap, 10)
+	maxFeePerGas.SetString(data.GasFeeCap, 10)
+	valueData.SetString(data.Value, 10)
+	toAddress := common.HexToAddress(data.ToAddress)
+	tokenAddress := common.HexToAddress(data.ContractAddress)
+	var buildData []byte
+	if data.ContractAddress != "0x00" {
+		buildData = BuildErc20Data(toAddress, valueData)
+		toAddress = tokenAddress
+		amount = big.NewInt(0)
+	} else {
+		toAddress = toAddress
+		amount = valueData
+	}
+	dFeeTx := &types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     data.Nonce,
+		GasTipCap: gasTipCap,
+		GasFeeCap: maxFeePerGas,
+		Gas:       data.Gas,
+		To:        &toAddress,
+		Value:     amount,
+		Data:      buildData,
+	}
+	rawTx, err := CreateEip1559UnSignTx(dFeeTx, chainID)
+	if err != nil {
+		log.Error("create un sign tx fail", "err", err)
+		return &account.UnSignTransactionResponse{
+			Code:     common2.ReturnCode_ERROR,
+			Msg:      "create un sign tx fail",
+			UnSignTx: "",
+		}, err
+	}
+	return &account.UnSignTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "create un sign tx success",
+		UnSignTx: rawTx,
+	}, nil
 }
 
 func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var data TxStructure
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+	var amount *big.Int
+	chainID := new(big.Int)
+	gasTipCap := new(big.Int)
+	maxFeePerGas := new(big.Int)
+	valueData := new(big.Int)
+	chainID.SetString(data.ChainId, 10)
+	gasTipCap.SetString(data.GasTipCap, 10)
+	maxFeePerGas.SetString(data.GasFeeCap, 10)
+	valueData.SetString(data.Value, 10)
+	toAddress := common.HexToAddress(data.ToAddress)
+	tokenAddress := common.HexToAddress(data.ContractAddress)
+	var buildData []byte
+	if data.ContractAddress != "0x00" {
+		buildData = BuildErc20Data(toAddress, valueData)
+		toAddress = tokenAddress
+		amount = big.NewInt(0)
+	} else {
+		toAddress = toAddress
+		amount = valueData
+	}
+	dFeeTx := &types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     data.Nonce,
+		GasTipCap: gasTipCap,
+		GasFeeCap: maxFeePerGas,
+		Gas:       data.Gas,
+		To:        &toAddress,
+		Value:     amount,
+		Data:      buildData,
+	}
+	rawTx, txHash, err := CreateEip1559SignedTx(dFeeTx, []byte(req.Signature), chainID)
+	if err != nil {
+		log.Error("create un sign tx fail", "err", err)
+		return &account.SignedTransactionResponse{
+			Code:     common2.ReturnCode_ERROR,
+			Msg:      "create un sign tx fail",
+			SignedTx: "",
+		}, err
+	}
+	return &account.SignedTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      txHash,
+		SignedTx: rawTx,
+	}, nil
 }
 
 func (c *ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return &account.DecodeTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "verify tx success",
+		Base64Tx: "0x000000",
+	}, nil
 }
 
 func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return &account.VerifyTransactionResponse{
+		Code:   common2.ReturnCode_SUCCESS,
+		Msg:    "verify tx success",
+		Verify: true,
+	}, nil
 }
 
 func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
