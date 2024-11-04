@@ -51,7 +51,7 @@ type TransactionResponse struct {
 	StateChangeHash     string    `json:"state_change_hash"`
 	EventRootHash       string    `json:"event_root_hash"`
 	StateCheckpointHash *string   `json:"state_checkpoint_hash"`
-	GasUsed             string    `json:"gas_used"`
+	GasUsed             uint64    `json:"gas_used,string"`
 	Success             bool      `json:"success"`
 	VMStatus            string    `json:"vm_status"`
 	AccumulatorRootHash string    `json:"accumulator_root_hash"`
@@ -111,13 +111,13 @@ type Reward struct {
 type Payload struct {
 	Function      string   `json:"function"`
 	TypeArguments []string `json:"type_arguments"`
-	Arguments     []string `json:"arguments"`
+	Arguments     []any    `json:"arguments"`
 	Type          string   `json:"type"`
 }
 
 type Signature struct {
-	PublicKey string `json:"public_key"`
-	Signature string `json:"signature"`
+	PublicKey any    `json:"public_key"`
+	Signature any    `json:"signature"`
 	Type      string `json:"type"`
 }
 

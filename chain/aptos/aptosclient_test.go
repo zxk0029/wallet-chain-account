@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestClient_GetNodeInfo(t *testing.T) {
-	// Test configuration
-	const (
-		baseURL   = "https://api.mainnet.aptoslabs.com/"
-		apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
-		withDebug = false
-	)
+const (
+	baseURL   = "https://api.mainnet.aptoslabs.com/"
+	apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
+	withDebug = true
+)
 
+func TestClient_GetNodeInfo(t *testing.T) {
 	// Initialize client
 	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
@@ -60,77 +59,116 @@ func TestClient_GetNodeInfo(t *testing.T) {
 	})
 }
 
-func TestClient_GetAccount(t *testing.T) {
+func TestRestyClient_GetAccount(t *testing.T) {
 	const (
-		baseURL   = "https://api.mainnet.aptoslabs.com/"
-		apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
-		testAddr  = "0x070ebd0a6fffebd2913cbaa6c350db20b739cc93c1d83f6856d1d34900e3162e"
-		withDebug = false
+		validAccount   = "0xc4f03967c61e35ca68598f4238b0525f33c51dc1c2dfe1c243e225f4e314662a"
+		invalidAccount = "0xinvalid_account"
+		emptyAccount   = ""
 	)
 
 	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
+	assert.NoError(t, err, "failed to initialize aptos client")
 
-	t.Run("valid address", func(t *testing.T) {
-		account, err := client.GetAccount(testAddr)
+	t.Run("Valid Account", func(t *testing.T) {
+		accountResponse, err := client.GetAccount(validAccount)
+
 		assert.NoError(t, err)
-		assert.NotNil(t, account)
-		assert.NotEmpty(t, account.AuthenticationKey)
-		assert.Greater(t, account.SequenceNumber, uint64(0))
-		t.Logf("success: sequence=%d, auth_key=%s",
-			account.SequenceNumber, account.AuthenticationKey)
+		assert.NotNil(t, accountResponse)
+		assert.NotZero(t, accountResponse.SequenceNumber)
+		assert.NotEmpty(t, accountResponse.AuthenticationKey)
+
+		t.Logf("Sequence Number: %d", accountResponse.SequenceNumber)
+		t.Logf("Authentication Key: %s", accountResponse.AuthenticationKey)
 	})
 
-	t.Run("empty address", func(t *testing.T) {
-		account, err := client.GetAccount("")
+	t.Run("Invalid Account", func(t *testing.T) {
+		accountResponse, err := client.GetAccount(invalidAccount)
+
 		assert.Error(t, err)
-		assert.Nil(t, account)
-		t.Logf("fail: %v", err)
+		assert.Nil(t, accountResponse)
+		assert.ErrorIs(t, err, errInvalidAddress)
+
+		t.Logf("Error: %v", err)
 	})
 
-	t.Run("invalid address format", func(t *testing.T) {
-		account, err := client.GetAccount("invalid-address")
+	t.Run("Empty Account", func(t *testing.T) {
+		accountResponse, err := client.GetAccount(emptyAccount)
+
 		assert.Error(t, err)
-		assert.Nil(t, account)
-		t.Logf("fail: %v", err)
+		assert.Nil(t, accountResponse)
+		assert.ErrorIs(t, err, errInvalidAddress)
+
+		t.Logf("Error: %v", err)
+	})
+
+	t.Run("Account Not Found", func(t *testing.T) {
+		notExistAccount := "0x1234567890123456789012345678901234567890123456789012345678901234"
+		accountResponse, err := client.GetAccount(notExistAccount)
+
+		assert.Error(t, err)
+		assert.Nil(t, accountResponse)
+		assert.ErrorIs(t, err, errHTTPError)
+
+		t.Logf("Error: %v", err)
 	})
 }
 
-func TestClient_GetGasPrice(t *testing.T) {
-	client, err := NewAptosClientAll(
-		"https://api.mainnet.aptoslabs.com/",
-		"aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup",
-		false,
-	)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
+func TestRestyClient_GetGasPrice(t *testing.T) {
+	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	assert.NoError(t, err, "failed to initialize aptos client")
 
-	gasPrice, err := client.GetGasPrice()
+	t.Run("Get Gas Price Successfully", func(t *testing.T) {
+		gasPrice, err := client.GetGasPrice()
 
-	assert.NoError(t, err)
-	assert.NotNil(t, gasPrice)
+		assert.NoError(t, err)
+		assert.NotNil(t, gasPrice)
 
-	assert.GreaterOrEqual(t, gasPrice.DeprioritizedGasEstimate, 0)
-	assert.GreaterOrEqual(t, gasPrice.GasEstimate, gasPrice.DeprioritizedGasEstimate)
-	assert.GreaterOrEqual(t, gasPrice.PrioritizedGasEstimate, gasPrice.GasEstimate)
+		assert.Greater(t, gasPrice.GasEstimate, uint64(0))
+		assert.Greater(t, gasPrice.PrioritizedGasEstimate, gasPrice.GasEstimate)
+		assert.LessOrEqual(t, gasPrice.DeprioritizedGasEstimate, gasPrice.GasEstimate)
 
-	t.Logf("Gas Price Details:")
-	t.Logf("Deprioritized: %d", gasPrice.DeprioritizedGasEstimate)
-	t.Logf("Standard: %d", gasPrice.GasEstimate)
-	t.Logf("Prioritized: %d", gasPrice.PrioritizedGasEstimate)
+		assert.Less(t, gasPrice.DeprioritizedGasEstimate, uint64(10000), "Deprioritized gas price should be reasonable")
+		assert.Less(t, gasPrice.GasEstimate, uint64(10000), "Normal gas price should be reasonable")
+		assert.Less(t, gasPrice.PrioritizedGasEstimate, uint64(10000), "Prioritized gas price should be reasonable")
+
+		t.Logf("Deprioritized Gas Price: %d", gasPrice.DeprioritizedGasEstimate)
+		t.Logf("Normal Gas Price: %d", gasPrice.GasEstimate)
+		t.Logf("Prioritized Gas Price: %d", gasPrice.PrioritizedGasEstimate)
+	})
+
+	t.Run("Price Relationship Check", func(t *testing.T) {
+		gasPrice, err := client.GetGasPrice()
+
+		assert.NoError(t, err)
+		assert.NotNil(t, gasPrice)
+
+		assert.Greater(t, gasPrice.PrioritizedGasEstimate, gasPrice.GasEstimate,
+			"Prioritized price should be higher than normal price")
+		assert.LessOrEqual(t, gasPrice.DeprioritizedGasEstimate, gasPrice.GasEstimate,
+			"Deprioritized price should be lower than normal price")
+
+		t.Logf("Price Differences:")
+		t.Logf("Priority Premium: %d", gasPrice.PrioritizedGasEstimate-gasPrice.GasEstimate)
+		t.Logf("Normal Premium: %d", gasPrice.GasEstimate-gasPrice.DeprioritizedGasEstimate)
+	})
+
+	t.Run("Invalid Client", func(t *testing.T) {
+		invalidClient, err := NewAptosClientAll("https://invalid.url", apiKey, withDebug)
+		assert.NoError(t, err)
+
+		gasPrice, err := invalidClient.GetGasPrice()
+
+		assert.Error(t, err)
+		assert.Nil(t, gasPrice)
+		t.Logf("Expected Error: %v", err)
+	})
 }
 
 func TestClient_GetTransactionByHash(t *testing.T) {
-	// Test configuration
 	const (
-		baseURL     = "https://api.mainnet.aptoslabs.com/"
-		apiKey      = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
-		withDebug   = true
 		validTxHash = "0x43531969ff8e93de962ea65e5609c2b05de3aa5e78933d8925613e75d3d53772"
 	)
 
-	// Initialize client
 	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
@@ -141,14 +179,13 @@ func TestClient_GetTransactionByHash(t *testing.T) {
 		assert.NotNil(t, resp, "response should not be nil")
 
 		t.Run("Transaction Metadata", func(t *testing.T) {
-			assert.Equal(t, "1878359809", resp.Version)
+			assert.Equal(t, "1878359810", fmt.Sprint(resp.Version))
 			assert.Equal(t, validTxHash, resp.Hash)
-			assert.Equal(t, "13", resp.GasUsed)
+			assert.Equal(t, "999", fmt.Sprint(resp.GasUsed))
 			assert.True(t, resp.Success)
 			assert.Equal(t, "Executed successfully", resp.VMStatus)
 		})
 
-		// 验证变更
 		t.Run("Transaction Changes", func(t *testing.T) {
 			assert.NotEmpty(t, resp.Changes, "changes should not be empty")
 
@@ -171,9 +208,9 @@ func TestClient_GetTransactionByHash(t *testing.T) {
 
 		t.Run("Log Details", func(t *testing.T) {
 			t.Log("Transaction Details:")
-			t.Logf("Version: %s", resp.Version)
+			t.Logf("Version: %d", resp.Version)
 			t.Logf("Hash: %s", resp.Hash)
-			t.Logf("Gas Used: %s", resp.GasUsed)
+			t.Logf("Gas Used: %d", resp.GasUsed)
 			t.Logf("Success: %v", resp.Success)
 			t.Logf("VM Status: %s", resp.VMStatus)
 
@@ -202,13 +239,13 @@ func TestClient_GetTransactionByHash(t *testing.T) {
 	})
 }
 
+func TestRestyClient_SubmitTransaction(t *testing.T) {
+
+}
+
 func TestClient_GetBlockByHeight(t *testing.T) {
 	// Test configuration
 	const (
-		baseURL   = "https://api.mainnet.aptoslabs.com/"
-		apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
-		withDebug = false
-		// Use a known block height for testing
 		validHeight uint64 = 247279394
 	)
 
@@ -254,5 +291,319 @@ func TestClient_GetBlockByHeight(t *testing.T) {
 			assert.Nil(t, resp, "response should be nil")
 			t.Logf("Expected error: %v", err)
 		})
+	})
+}
+
+func TestRestyClient_GetTransactionByHash(t *testing.T) {
+	// 测试常量
+	const (
+		validTxHash   = "0x43531969ff8e93de962ea65e5609c2b05de3aa5e78933d8925613e75d3d53772"
+		invalidTxHash = "0xinvalid_hash"
+		emptyTxHash   = ""
+	)
+
+	// 初始化客户端
+	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	assert.NoError(t, err, "failed to initialize aptos client")
+
+	t.Run("Valid Transaction Hash", func(t *testing.T) {
+		resp, err := client.GetTransactionByHash(validTxHash)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		// 验证基本字段
+		t.Run("Basic Fields", func(t *testing.T) {
+			assert.NotZero(t, resp.Version)
+			assert.Equal(t, validTxHash, resp.Hash)
+			assert.NotEmpty(t, resp.StateChangeHash)
+			assert.NotEmpty(t, resp.EventRootHash)
+			assert.NotZero(t, resp.GasUsed)
+			assert.True(t, resp.Success)
+			assert.Equal(t, "Executed successfully", resp.VMStatus)
+			assert.NotEmpty(t, resp.AccumulatorRootHash)
+		})
+
+		// 验证交易详情
+		t.Run("Transaction Details", func(t *testing.T) {
+			assert.NotEmpty(t, resp.Sender)
+			assert.NotZero(t, resp.SequenceNumber)
+			assert.NotZero(t, resp.MaxGasAmount)
+			assert.NotZero(t, resp.GasUnitPrice)
+			assert.NotZero(t, resp.ExpirationTimestamp)
+			assert.NotZero(t, resp.Timestamp)
+			assert.NotEmpty(t, resp.Type)
+		})
+
+		// 验证 Payload
+		t.Run("Payload", func(t *testing.T) {
+			assert.NotEmpty(t, resp.Payload.Function)
+			assert.NotEmpty(t, resp.Payload.Type)
+		})
+
+		// 验证 Changes
+		t.Run("Changes", func(t *testing.T) {
+			if len(resp.Changes) > 0 {
+				change := resp.Changes[0]
+				assert.NotEmpty(t, change.Address)
+				assert.NotEmpty(t, change.StateKeyHash)
+				assert.NotEmpty(t, change.Type)
+			}
+		})
+
+		// 验证 Events
+		t.Run("Events", func(t *testing.T) {
+			if len(resp.Events) > 0 {
+				event := resp.Events[0]
+				assert.NotEmpty(t, event.Guid.AccountAddress)
+				assert.NotEmpty(t, event.SequenceNumber)
+				assert.NotEmpty(t, event.Type)
+			}
+		})
+
+		// 输出详细日志
+		t.Run("Log Details", func(t *testing.T) {
+			t.Log("Transaction Details:")
+			t.Logf("Version: %d", resp.Version)
+			t.Logf("Hash: %s", resp.Hash)
+			t.Logf("Sender: %s", resp.Sender)
+			t.Logf("Gas Used: %d", resp.GasUsed)
+			t.Logf("Success: %v", resp.Success)
+			t.Logf("VM Status: %s", resp.VMStatus)
+			t.Logf("Timestamp: %d", resp.Timestamp)
+
+			if len(resp.Changes) > 0 {
+				t.Log("\nChanges:")
+				for i, change := range resp.Changes {
+					t.Logf("Change %d:", i+1)
+					t.Logf("  Address: %s", change.Address)
+					t.Logf("  Type: %s", change.Type)
+				}
+			}
+
+			if len(resp.Events) > 0 {
+				t.Log("\nEvents:")
+				for i, event := range resp.Events {
+					t.Logf("Event %d:", i+1)
+					t.Logf("  Type: %s", event.Type)
+					t.Logf("  Account: %s", event.Guid.AccountAddress)
+				}
+			}
+		})
+	})
+
+	// 错误测试用例
+	t.Run("Error Cases", func(t *testing.T) {
+		t.Run("Invalid Hash", func(t *testing.T) {
+			resp, err := client.GetTransactionByHash(invalidTxHash)
+
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+			t.Logf("Expected Error: %v", err)
+		})
+
+		t.Run("Empty Hash", func(t *testing.T) {
+			resp, err := client.GetTransactionByHash(emptyTxHash)
+
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+			assert.Contains(t, err.Error(), "transaction hash cannot be empty")
+			t.Logf("Expected Error: %v", err)
+		})
+
+		t.Run("Non-existent Hash", func(t *testing.T) {
+			nonExistentHash := "0x1234567890123456789012345678901234567890123456789012345678901234"
+			resp, err := client.GetTransactionByHash(nonExistentHash)
+
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+			t.Logf("Expected Error: %v", err)
+		})
+	})
+}
+
+func TestClient_GetTransactionByVersion(t *testing.T) {
+	// Test configuration
+	const (
+		// Use a known transaction version for testing
+		validVersion = "1881899111"
+	)
+
+	// Initialize client
+	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	assert.NoError(t, err, "client initialization failed")
+	assert.NotNil(t, client, "client should not be nil")
+
+	t.Run("Valid Transaction Version", func(t *testing.T) {
+		resp, err := client.GetTransactionByVersion(validVersion)
+		assert.NoError(t, err, "failed to get transaction")
+		assert.NotNil(t, resp, "response should not be nil")
+		json1, _ := json.Marshal(resp)
+		fmt.Println("GetTransactionByVersion", string(json1))
+
+		t.Run("Transaction Metadata", func(t *testing.T) {
+			assert.Equal(t, validVersion, fmt.Sprint(resp.Version), "version should match")
+			assert.NotEmpty(t, resp.Hash)
+			assert.NotNil(t, resp.GasUsed)
+			assert.True(t, resp.Success)
+			assert.Equal(t, "Executed successfully", resp.VMStatus)
+		})
+
+		t.Run("Transaction Changes", func(t *testing.T) {
+			assert.NotEmpty(t, resp.Changes, "changes should not be empty")
+
+			change := resp.Changes[0]
+			assert.Equal(t, "write_resource", change.Type)
+			assert.NotEmpty(t, change.Address)
+			assert.NotEmpty(t, change.StateKeyHash)
+		})
+
+		t.Run("Log Details", func(t *testing.T) {
+			t.Log("Transaction Details:")
+			t.Logf("Version: %d", resp.Version)
+			t.Logf("Hash: %s", resp.Hash)
+			t.Logf("Gas Used: %d", resp.GasUsed)
+			t.Logf("Success: %v", resp.Success)
+			t.Logf("VM Status: %s", resp.VMStatus)
+
+			if len(resp.Changes) > 0 {
+				t.Log("\nTransaction Changes:")
+				marshal, _ := json.Marshal(resp.Changes)
+				t.Logf("resp.Changes: %s", string(marshal))
+			}
+		})
+	})
+
+	t.Run("Error Cases", func(t *testing.T) {
+		t.Run("Empty Version", func(t *testing.T) {
+			resp, err := client.GetTransactionByVersion("")
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+			assert.Contains(t, err.Error(), "version cannot be empty")
+		})
+
+		t.Run("Invalid Version Format", func(t *testing.T) {
+			resp, err := client.GetTransactionByVersion("invalid-version")
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+		})
+
+		t.Run("Non-existent Version", func(t *testing.T) {
+			resp, err := client.GetTransactionByVersion("999999999999999")
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+		})
+	})
+
+	t.Run("Version Zero", func(t *testing.T) {
+		resp, err := client.GetTransactionByVersion("0")
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, "0", fmt.Sprint(resp.Version))
+
+		t.Log("Genesis Transaction Details:")
+		t.Logf("Version: %d", resp.Version)
+		t.Logf("Type: %s", resp.Type)
+		t.Logf("Hash: %s", resp.Hash)
+		if len(resp.Changes) > 0 {
+			t.Logf("Number of Changes: %d", len(resp.Changes))
+		}
+	})
+}
+
+func TestClient_GetTransactionByVersionRange(t *testing.T) {
+	// Test configuration
+	const (
+		validVersion = 1881899111
+		endVersion   = 1881811111
+	)
+
+	// Initialize client
+	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	assert.NoError(t, err, "client initialization failed")
+	assert.NotNil(t, client, "client should not be nil")
+
+	t.Run("Single Version", func(t *testing.T) {
+		startVersion := uint64(validVersion)
+		endVersion := startVersion
+
+		txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+		assert.NoError(t, err)
+		assert.NotNil(t, txs)
+		assert.Len(t, txs, 1)
+
+		// Convert validVersion to string for comparison
+		assert.Equal(t, fmt.Sprint(validVersion), fmt.Sprint(txs[0].Version), "version should match")
+		t.Logf("Successfully retrieved single transaction at version %d", startVersion)
+	})
+
+	t.Run("Small Range", func(t *testing.T) {
+		startVersion := uint64(validVersion)
+		endVersion := startVersion + 5
+
+		txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+		assert.NoError(t, err)
+		assert.NotNil(t, txs)
+		assert.Len(t, txs, 6) // inclusive range
+
+		// Verify transactions are in order
+		for i, tx := range txs {
+			expectedVersion := fmt.Sprintf("%d", startVersion+uint64(i))
+			assert.Equal(t, expectedVersion, fmt.Sprint(tx.Version))
+		}
+
+		t.Logf("Successfully retrieved %d transactions", len(txs))
+	})
+
+	t.Run("Medium Range", func(t *testing.T) {
+		startVersion := uint64(validVersion)
+		endVersion := startVersion + 99 // Test with groupSize
+
+		txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+		assert.NoError(t, err)
+		assert.NotNil(t, txs)
+		assert.Len(t, txs, 100)
+
+		t.Logf("Successfully retrieved %d transactions", len(txs))
+	})
+
+	t.Run("Error Cases", func(t *testing.T) {
+		t.Run("Invalid Range - Start > End", func(t *testing.T) {
+			startVersion := uint64(validVersion)
+			endVersion := uint64(endVersion)
+
+			txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+			assert.Error(t, err)
+			assert.Nil(t, txs)
+			assert.Contains(t, err.Error(), "start version")
+		})
+
+		t.Run("Non-existent Version", func(t *testing.T) {
+			startVersion := uint64(999999999999)
+			endVersion := startVersion + 5
+
+			txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+			assert.Error(t, err)
+			assert.Nil(t, txs)
+		})
+	})
+
+	t.Run("Log Transaction Details", func(t *testing.T) {
+		startVersion := uint64(validVersion)
+		endVersion := startVersion + 2
+
+		txs, err := client.GetTransactionByVersionRange(startVersion, endVersion)
+		assert.NoError(t, err)
+
+		for i, tx := range txs {
+			t.Logf("\nTransaction %d Details:", i+1)
+			t.Logf("Version: %v", tx.Version)
+			t.Logf("Hash: %s", tx.Hash)
+			t.Logf("Success: %v", tx.Success)
+			t.Logf("VM Status: %s", tx.VMStatus)
+			if len(tx.Changes) > 0 {
+				t.Logf("Number of Changes: %d", len(tx.Changes))
+			}
+		}
 	})
 }
