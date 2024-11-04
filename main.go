@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/cosmos/cosmos-sdk/client"
+
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/tendermint/tendermint/rpc/client/http"
 )
 
 func main() {
@@ -15,12 +15,12 @@ func main() {
 	client, _ := client.NewClientFromNode(nodeURI)
 	ctx = ctx.WithClient(client)
 
-	client.Status(context.Background())
-	client.Header()
+	status, _ := client.Status(context.Background())
+	fmt.Println("status :(%s)", status)
 
 	// 初始化查询客户端
-	queryClient := types.NewQueryClient(ctx)
-
+	var queryClient types.QueryClient = types.NewQueryClient(ctx)
+	//
 	// 获取账户余额
 	address := "cosmos19thxsunl9lzywglsndth5a278wtavawzzpv44q"
 	getAccountBalance(queryClient, address)
@@ -113,30 +113,30 @@ func getAccountBalance(queryClient types.QueryClient, address string) {
 	}
 }
 
-func getBlock(tmRPC *http.HTTP, height int64) {
-	// 获取区块信息
-	block, err := tmRPC.Block(context.Background(), &height)
-	if err != nil {
-		panic(err)
-	}
-
-	// 打印区块信息
-	fmt.Printf("Block Height: %d\n", block.Block.Height)
-	fmt.Printf("Block Hash: %s\n", block.Block.Hash())
-	fmt.Printf("Block Time: %s\n", block.Block.Time)
-}
-
-func getTransaction(tmRPC *http.HTTP, txHash string) {
-	// 获取交易信息
-	txResult, err := tmRPC.Tx(context.Background(), []byte(txHash), true)
-	if err != nil {
-		panic(err)
-	}
-
-	// 打印交易信息
-	fmt.Printf("Transaction Hash: %s\n", txResult.Hash)
-	fmt.Printf("Height: %d\n", txResult.Height)
-	fmt.Printf("Index: %d\n", txResult.Index)
-	fmt.Printf("TxResult: %+v\n", txResult.TxResult)
-	fmt.Printf("Tx: %s\n", txResult.Tx)
-}
+//func getBlock(tmRPC *http.HTTP, height int64) {
+//	// 获取区块信息
+//	block, err := tmRPC.Block(context.Background(), &height)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// 打印区块信息
+//	fmt.Printf("Block Height: %d\n", block.Block.Height)
+//	fmt.Printf("Block Hash: %s\n", block.Block.Hash())
+//	fmt.Printf("Block Time: %s\n", block.Block.Time)
+//}
+//
+//func getTransaction(tmRPC *http.HTTP, txHash string) {
+//	// 获取交易信息
+//	txResult, err := tmRPC.Tx(context.Background(), []byte(txHash), true)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// 打印交易信息
+//	fmt.Printf("Transaction Hash: %s\n", txResult.Hash)
+//	fmt.Printf("Height: %d\n", txResult.Height)
+//	fmt.Printf("Index: %d\n", txResult.Index)
+//	fmt.Printf("TxResult: %+v\n", txResult.TxResult)
+//	fmt.Printf("Tx: %s\n", txResult.Tx)
+//}
