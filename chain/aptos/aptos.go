@@ -1,15 +1,17 @@
 package aptos
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"regexp"
+
 	"strconv"
 	"strings"
 
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"golang.org/x/crypto/sha3"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
@@ -28,6 +30,7 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	apiKey := conf.WalletNode.Aptos.DataApiKey
 	aptosClient, err := NewAptosClient(rpcUrl, apiKey)
 	if err != nil {
+		log.Error("NewChainAdaptor NewAptosClient fail", "err", err)
 		return nil, err
 	}
 	return &ChainAdaptor{
@@ -57,63 +60,86 @@ func (c *ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*acco
 			Msg:  msg,
 		}, nil
 	}
-	publicKeyBytes, err := hex.DecodeString(req.PublicKey)
+	pubKeyHex := req.PublicKey
+
+	pubKey := &crypto.Ed25519PublicKey{}
+	err := pubKey.FromHex(pubKeyHex)
 	if err != nil {
-		log.Error("ConvertAddress DecodeString fail", "err", err)
-		return &account.ConvertAddressResponse{
-			Code: common2.ReturnCode_ERROR,
-			Msg:  "ConvertAddress DecodeString fail",
-		}, nil
+		log.Error("ConvertAddress pubKey FromHex fail", "err", err)
+		return nil, fmt.Errorf("invalid pubKey: %v", err)
 	}
 
-	hasher := sha3.New256()
-	hasher.Write(publicKeyBytes)
-	hash := hasher.Sum(nil)
+	authKey := &crypto.AuthenticationKey{}
+	authKey.FromPublicKey(pubKey)
 
-	aptosAddress := "0x" + hex.EncodeToString(hash)
+	address := &aptos.AccountAddress{}
+	address.FromAuthKey(authKey)
 
 	return &account.ConvertAddressResponse{
 		Code:    common2.ReturnCode_SUCCESS,
 		Msg:     "convert address success",
-		Address: aptosAddress,
+		Address: address.String(),
 	}, nil
 }
 
 func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
+	response := &account.ValidAddressResponse{
+		Code:  common2.ReturnCode_ERROR,
+		Msg:   "",
+		Valid: false,
+	}
+
 	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_ERROR,
-			Msg:   msg,
-			Valid: false,
-		}, nil
+		response.Valid = false
+		response.Code = common2.ReturnCode_ERROR
+		response.Msg = msg
+		return response, nil
 	}
-	if len(req.Address) != 66 || !strings.HasPrefix(req.Address, "0x") {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: wrong length or missing 0x prefix",
-			Valid: false,
-		}, nil
+
+	errTooShrot := "AccountAddress too short"
+	errTooLong := "AccountAddress too long"
+
+	address := req.Address
+	aptosAccountAddress := &aptos.AccountAddress{}
+	err := aptosAccountAddress.ParseStringRelaxed(address)
+	if err != nil {
+		switch err.Error() {
+		case errTooShrot:
+			response.Valid = false
+			response.Code = common2.ReturnCode_ERROR
+			response.Msg = errTooShrot
+			return response, nil
+		case errTooLong:
+			response.Valid = false
+			response.Code = common2.ReturnCode_ERROR
+			response.Msg = errTooLong
+			return response, nil
+		default:
+			tempErr := fmt.Errorf("invalid address format: %v", err)
+			response.Valid = false
+			response.Code = common2.ReturnCode_ERROR
+			response.Msg = tempErr.Error()
+			return response, nil
+		}
 	}
-	ok := regexp.MustCompile("^[0-9a-fA-F]{64}$").MatchString(req.Address[2:])
-	if !ok {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: contains invalid characters",
-			Valid: false,
-		}, nil
+
+	cleanAddr := address
+	if strings.HasPrefix(cleanAddr, "0x") {
+		cleanAddr = cleanAddr[2:]
 	}
-	if strings.TrimPrefix(req.Address, "0x") == strings.Repeat("0", 64) {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: cannot be all zeros",
-			Valid: false,
-		}, nil
+
+	_, err = hex.DecodeString(cleanAddr)
+	if err != nil {
+		response.Valid = false
+		response.Code = common2.ReturnCode_ERROR
+		response.Msg = "address contains invalid hex characters"
+		return response, nil
 	}
-	return &account.ValidAddressResponse{
-		Code:  common2.ReturnCode_SUCCESS,
-		Msg:   "valid address",
-		Valid: true,
-	}, nil
+
+	response.Valid = true
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "ValidAddress success"
+	return response, nil
 }
 
 func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
@@ -467,8 +493,33 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 			Msg:  msg,
 		}, nil
 	}
-	//TODO implement me
-	panic("implement me")
+
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("CreateUnSignTransaction DecodeString fail", "err", err)
+		return nil, err
+	}
+
+	var data SubmitTransactionRequest
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		log.Error("CreateUnSignTransaction Unmarshal fail", "err", err)
+		return nil, err
+	}
+
+	jsonBytes, err = json.Marshal(data)
+	if err != nil {
+		log.Error("CreateUnSignTransaction Marshal fail", "err", err)
+		return nil, fmt.Errorf("marshal transaction failed: %w", err)
+	}
+
+	base64Tx := base64.StdEncoding.EncodeToString(jsonBytes)
+
+	response := &account.UnSignTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "CreateUnSignTransaction success",
+		UnSignTx: base64Tx,
+	}
+	return response, err
 }
 
 func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {

@@ -12,26 +12,42 @@ type EstimateGasPriceResponse struct {
 }
 
 type SubmitTransactionRequest struct {
+	ChainId                 uint8                `json:"chain_id"`
 	Sender                  string               `json:"sender"`
-	SequenceNumber          string               `json:"sequence_number"`
-	MaxGasAmount            string               `json:"max_gas_amount"`
-	GasUnitPrice            string               `json:"gas_unit_price"`
-	ExpirationTimestampSecs string               `json:"expiration_timestamp_secs"`
+	SequenceNumber          uint64               `json:"sequence_number"`
+	MaxGasAmount            uint64               `json:"max_gas_amount"`
+	GasUnitPrice            uint64               `json:"gas_unit_price"`
+	ExpirationTimestampSecs uint64               `json:"expiration_timestamp_secs"`
 	Payload                 TransactionPayload   `json:"payload"`
 	Signature               TransactionSignature `json:"signature"`
 }
 
+type PayloadType string
+
+const (
+	EntryFunctionPayload PayloadType = "entry_function_payload"
+	ScriptPayload        PayloadType = "script_payload"
+	ModuleBundlePayload  PayloadType = "module_bundle_payload"
+)
+
 type TransactionPayload struct {
-	Type          string        `json:"type"`
+	Type          PayloadType   `json:"type"`
 	Function      string        `json:"function"`
 	TypeArguments []string      `json:"type_arguments"`
 	Arguments     []interface{} `json:"arguments"`
 }
+type SignatureType string
+
+const (
+	Ed25519Signature SignatureType = "ed25519_signature"
+	MultiSignature   SignatureType = "multi_signature"
+	MultiEd25519     SignatureType = "multi_ed25519"
+)
 
 type TransactionSignature struct {
-	Type      string `json:"type"`
-	PublicKey string `json:"public_key"`
-	Signature string `json:"signature"`
+	Type      SignatureType `json:"type"`
+	PublicKey string        `json:"public_key"`
+	Signature string        `json:"signature"`
 }
 
 type SubmitTransactionResponse struct {

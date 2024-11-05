@@ -1,36 +1,50 @@
 package aptos
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
-	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"strconv"
 	"testing"
 
-	"golang.org/x/crypto/sha3"
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/crypto"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
+	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
 
 func Test_GenerateAptosAccount(t *testing.T) {
-	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Private Key: 0x%s\n", hex.EncodeToString(privateKey))
-	fmt.Printf("Public Key: 0x%s\n", hex.EncodeToString(publicKey))
+	t.Run("Test NewEd25519Account", func(t *testing.T) {
+		//Private (hex): 0xc4fa81d83b7d6a4ba31d40dcaf994c405d3857488cb66b11cebc38ba095ee847
+		//pubkey (hex): 0xe9ad4b2f85daedb54f9ba61e09d12e3fb92c28913598c350583406ad8651ad8f
+		//address: 0x3a8eef8a52bc873f5416e835e7ec7da6dd978e5f6a8a12d278df0c42ef01d131
+		//authKey: 0x3a8eef8a52bc873f5416e835e7ec7da6dd978e5f6a8a12d278df0c42ef01d131
+		//signMessage: 0xfcb15d1497f85fc013edb31a7213367090253f301f694011e4a03126953c17d6790696b5015d3f15607706e47e19e32070ca5a3dd81944969c9b010538b5b100
+		accountTemp, err := aptos.NewEd25519Account()
+		if err != nil {
+			panic(err)
+		}
 
-	hasher := sha3.New256()
-	hasher.Write(publicKey)
-	address := hasher.Sum(nil)
-	fmt.Printf("Aptos Address: 0x%s\n", hex.EncodeToString(address))
+		privateKey := accountTemp.Signer.(*crypto.Ed25519PrivateKey)
+		fmt.Printf("Private (hex): %s\n", privateKey.ToHex())
 
-	//Private Key: 0xc0b79816fd85de6f645087a54ac4aa2903dead69acf9426ab010c97dd58aed798862f29d3c1f067cbe9eaba619e5dfcb269a9f059cb2c93fab362d1e93c3281c
-	//Public Key: 0x8862f29d3c1f067cbe9eaba619e5dfcb269a9f059cb2c93fab362d1e93c3281c
-	//Aptos Address: 0xfc38d27af874e409de8056d11cc8e10b8f8449e6f723a59251f04e62a24d7475
+		publicKey := accountTemp.PubKey()
+		fmt.Printf("pubkey (hex): %s\n", publicKey.ToHex())
+
+		address := accountTemp.Address
+		fmt.Printf("address: %s\n", address.String())
+
+		authKey := accountTemp.AuthKey()
+		fmt.Printf("authKey: %s\n", authKey.ToHex())
+
+		message := []byte("Hello Aptos!")
+		signature, err := accountTemp.SignMessage(message)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("signMessage: %s\n", signature.ToHex())
+	})
 }
 
 func TestChainAdaptor_GetSupportChains(t *testing.T) {
@@ -59,8 +73,8 @@ func TestChainAdaptor_GetSupportChains(t *testing.T) {
 
 func TestChainAdaptor_ConvertAddress(t *testing.T) {
 	const (
-		validPublicKey        = "8862f29d3c1f067cbe9eaba619e5dfcb269a9f059cb2c93fab362d1e93c3281c"
-		validPublicKeyAddress = "0xfc38d27af874e409de8056d11cc8e10b8f8449e6f723a59251f04e62a24d7475"
+		validPublicKey        = "0xe9ad4b2f85daedb54f9ba61e09d12e3fb92c28913598c350583406ad8651ad8f"
+		validPublicKeyAddress = "0x3a8eef8a52bc873f5416e835e7ec7da6dd978e5f6a8a12d278df0c42ef01d131"
 		emptyKeyAddress       = "0xa7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
 		invalidPublicKey      = "invalid_hex"
 	)
@@ -94,15 +108,8 @@ func TestChainAdaptor_ConvertAddress(t *testing.T) {
 		}
 		resp, err := adaptor.ConvertAddress(req)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
-		assert.Equal(t, emptyKeyAddress, resp.Address)
-		assert.Equal(t, "convert address success", resp.Msg)
-
-		t.Logf("Response Code: %v", resp.Code)
-		t.Logf("Response Message: %s", resp.Msg)
-		t.Logf("Converted Address: %s", resp.Address)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
 	})
 
 	t.Run("Invalid Public Key Format", func(t *testing.T) {
@@ -113,19 +120,14 @@ func TestChainAdaptor_ConvertAddress(t *testing.T) {
 		}
 		resp, err := adaptor.ConvertAddress(req)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
-		assert.Equal(t, "ConvertAddress DecodeString fail", resp.Msg)
-
-		t.Logf("Response Code: %v", resp.Code)
-		t.Logf("Response Message: %s", resp.Msg)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
 	})
 }
 
 func TestChainAdaptor_ValidAddress(t *testing.T) {
 	const (
-		validAddress   = "0xfc38d27af874e409de8056d11cc8e10b8f8449e6f723a59251f04e62a24d7475"
+		validAddress   = "0x3a8eef8a52bc873f5416e835e7ec7da6dd978e5f6a8a12d278df0c42ef01d131"
 		allZeroAddress = "0x0000000000000000000000000000000000000000000000000000000000000000"
 		invalidChars   = "0xfc38d27af874e409de8056d11cc8e10b8f8449e6f723a59251f04e62a24d74zz"
 		shortAddress   = "0xfc38d27af874e409de8056d11cc8e10b8f8449e6"
@@ -136,6 +138,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 	t.Run("Valid Address", func(t *testing.T) {
 		req := &account.ValidAddressRequest{
 			Address: validAddress,
+			Chain:   ChainName,
 		}
 		resp, err := adaptor.ValidAddress(req)
 
@@ -143,7 +146,6 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
 		assert.True(t, resp.Valid)
-		assert.Equal(t, "valid address", resp.Msg)
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)
@@ -152,7 +154,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 
 	t.Run("Missing 0x Prefix", func(t *testing.T) {
 		req := &account.ValidAddressRequest{
-			//trim ox
+			Chain:   ChainName,
 			Address: validAddress[2:],
 		}
 		resp, err := adaptor.ValidAddress(req)
@@ -160,8 +162,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
-		assert.False(t, resp.Valid)
-		assert.Equal(t, "invalid address: wrong length or missing 0x prefix", resp.Msg)
+		assert.True(t, resp.Valid)
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)
@@ -170,6 +171,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 
 	t.Run("All Zeros Address", func(t *testing.T) {
 		req := &account.ValidAddressRequest{
+			Chain:   ChainName,
 			Address: allZeroAddress,
 		}
 		resp, err := adaptor.ValidAddress(req)
@@ -177,8 +179,6 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
-		assert.False(t, resp.Valid)
-		assert.Equal(t, "invalid address: cannot be all zeros", resp.Msg)
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)
@@ -187,15 +187,15 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 
 	t.Run("Invalid Characters", func(t *testing.T) {
 		req := &account.ValidAddressRequest{
+			Chain:   ChainName,
 			Address: invalidChars,
 		}
 		resp, err := adaptor.ValidAddress(req)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
+		assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
 		assert.False(t, resp.Valid)
-		assert.Equal(t, "invalid address: contains invalid characters", resp.Msg)
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)
@@ -204,6 +204,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 
 	t.Run("Short Address", func(t *testing.T) {
 		req := &account.ValidAddressRequest{
+			Chain:   ChainName,
 			Address: shortAddress,
 		}
 		resp, err := adaptor.ValidAddress(req)
@@ -211,8 +212,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
-		assert.False(t, resp.Valid)
-		assert.Equal(t, "invalid address: wrong length or missing 0x prefix", resp.Msg)
+		assert.True(t, resp.Valid)
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)

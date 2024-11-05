@@ -369,16 +369,16 @@ func ValidateSubmitTransaction(req *SubmitTransactionRequest) error {
 	}
 
 	// require req
-	if req.SequenceNumber == "" {
+	if req.SequenceNumber == 0 {
 		return errors.New("sequence number is required")
 	}
-	if req.MaxGasAmount == "" {
+	if req.MaxGasAmount == 0 {
 		return errors.New("max gas amount is required")
 	}
-	if req.GasUnitPrice == "" {
+	if req.GasUnitPrice == 0 {
 		return errors.New("gas unit price is required")
 	}
-	if req.ExpirationTimestampSecs == "" {
+	if req.ExpirationTimestampSecs == 0 {
 		return errors.New("expiration timestamp is required")
 	}
 
