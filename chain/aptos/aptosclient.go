@@ -17,7 +17,7 @@ type Client interface {
 
 	GetAccount(inputAddr string) (*AccountResponse, error)
 	GetGasPrice() (*EstimateGasPriceResponse, error)
-	SubmitTransaction(req *SubmitTransactionRequest) (*SubmitTransactionResponse, error)
+	//SubmitTransaction(req *SubmitTransactionRequest) (*SubmitTransactionResponse, error)
 
 	GetBlockByHeight(height uint64) (*BlockResponse, error)
 
@@ -60,11 +60,11 @@ type RestyClient struct {
 	client *gresty.Client
 }
 
-func NewAptosClient(baseUrl, apiKey string) (*RestyClient, error) {
-	return NewAptosClientAll(baseUrl, apiKey, defaultWithDebug)
+func NewAptosHttpClient(baseUrl, apiKey string) (*RestyClient, error) {
+	return NewAptosHttpClientAll(baseUrl, apiKey, defaultWithDebug)
 }
 
-func NewAptosClientAll(baseUrl, apiKey string, withDebug bool) (*RestyClient, error) {
+func NewAptosHttpClientAll(baseUrl, apiKey string, withDebug bool) (*RestyClient, error) {
 	client := gresty.New()
 	client.SetBaseURL(baseUrl)
 	client.SetTimeout(defaultRequestTimeout)
@@ -143,28 +143,28 @@ func (c *RestyClient) GetGasPrice() (*EstimateGasPriceResponse, error) {
 	return gasPrice, nil
 }
 
-func (c *RestyClient) SubmitTransaction(req *SubmitTransactionRequest) (*SubmitTransactionResponse, error) {
-	// check req
-	if err := ValidateSubmitTransaction(req); err != nil {
-		return nil, fmt.Errorf("invalid request: %w", err)
-	}
-
-	response := &SubmitTransactionResponse{}
-	resp, err := c.client.R().
-		SetBody(req).
-		SetResult(response).
-		Post(pathTransactions)
-
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-
-	if resp.IsError() {
-		return nil, fmt.Errorf("failed to broadcast transaction: %w", errHTTPError)
-	}
-
-	return response, nil
-}
+//func (c *RestyClient) SubmitTransaction(req *SubmitTransactionRequest) (*SubmitTransactionResponse, error) {
+//	// check req
+//	if err := ValidateSubmitTransaction(req); err != nil {
+//		return nil, fmt.Errorf("invalid request: %w", err)
+//	}
+//
+//	response := &SubmitTransactionResponse{}
+//	resp, err := c.client.R().
+//		SetBody(req).
+//		SetResult(response).
+//		Post(pathTransactions)
+//
+//	if err != nil {
+//		return nil, fmt.Errorf("request failed: %w", err)
+//	}
+//
+//	if resp.IsError() {
+//		return nil, fmt.Errorf("failed to broadcast transaction: %w", errHTTPError)
+//	}
+//
+//	return response, nil
+//}
 
 func (c *RestyClient) GetBlockByHeight(height uint64) (*BlockResponse, error) {
 	if height < 0 {
@@ -359,28 +359,28 @@ func IsValidAddress(inputAddr string) bool {
 	return err == nil
 }
 
-func ValidateSubmitTransaction(req *SubmitTransactionRequest) error {
-	if req == nil {
-		return errors.New("request cannot be nil")
-	}
-
-	if !IsValidAddress(req.Sender) {
-		return fmt.Errorf("invalid sender address: %s", req.Sender)
-	}
-
-	// require req
-	if req.SequenceNumber == 0 {
-		return errors.New("sequence number is required")
-	}
-	if req.MaxGasAmount == 0 {
-		return errors.New("max gas amount is required")
-	}
-	if req.GasUnitPrice == 0 {
-		return errors.New("gas unit price is required")
-	}
-	if req.ExpirationTimestampSecs == 0 {
-		return errors.New("expiration timestamp is required")
-	}
-
-	return nil
-}
+//func ValidateSubmitTransaction(req *SubmitTransactionRequest) error {
+//	if req == nil {
+//		return errors.New("request cannot be nil")
+//	}
+//
+//	if !IsValidAddress(req.Sender) {
+//		return fmt.Errorf("invalid sender address: %s", req.Sender)
+//	}
+//
+//	// require req
+//	if req.SequenceNumber == 0 {
+//		return errors.New("sequence number is required")
+//	}
+//	if req.MaxGasAmount == 0 {
+//		return errors.New("max gas amount is required")
+//	}
+//	if req.GasUnitPrice == 0 {
+//		return errors.New("gas unit price is required")
+//	}
+//	if req.ExpirationTimestampSecs == 0 {
+//		return errors.New("expiration timestamp is required")
+//	}
+//
+//	return nil
+//}

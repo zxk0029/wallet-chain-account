@@ -1,6 +1,7 @@
 package aptos
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/crypto"
@@ -83,106 +84,94 @@ func TestCreateDifferentAccounts(t *testing.T) {
 }
 
 func TestValidateAptosAddress(t *testing.T) {
-	t.Run("验证 Aptos 地址", func(t *testing.T) {
-		// 1. 创建 AccountAddress 实例
+	t.Run("Validate Aptos Address", func(t *testing.T) {
 		address := &aptos.AccountAddress{}
 
-		// 2. 测试地址
 		testAddress := "0x34d8e3074323789467ce1e5d2c538312985dcd3b8889f29ce23e08b0d798404d"
 
-		// 3. 解析地址
 		err := address.ParseStringRelaxed(testAddress)
 		if err != nil {
-			t.Fatalf("地址解析失败: %v", err)
+			t.Fatalf("ParseStringRelaxed testAddress fail: %v", err)
 		}
 
-		// 4. 验证地址格式
-		// 验证标准格式输出
-		assert.Equal(t, testAddress, address.String(), "地址格式化输出应该匹配")
+		assert.Equal(t, testAddress, address.String(), "testAddress address Equal")
 
-		// 5. 验证完整格式（补零）
 		fullAddress := address.StringLong()
-		assert.Equal(t, 66, len(fullAddress), "完整地址长度应为66（包含0x前缀）")
+		assert.Equal(t, 66, len(fullAddress), "fullAddress is 66 len")
 
-		// 6. 测试不同格式的地址
-		// 测试无0x前缀
 		addressWithoutPrefix := testAddress[2:]
 		err = address.ParseStringRelaxed(addressWithoutPrefix)
-		assert.NoError(t, err, "应该能解析无0x前缀的地址")
+		assert.NoError(t, err, "should call ParseStringRelaxed with addressWithoutPrefix")
 
-		// 9. 打印验证结果
-		fmt.Printf("地址验证成功:\n")
-		fmt.Printf("address 标准格式: %s\n", address.String())
-		fmt.Printf("address 完整格式: %s\n", address.StringLong())
-		fmt.Printf("address 完整格式 len: %d\n", len(address))
+		fmt.Printf("Validate Aptos Address success:\n")
+		fmt.Printf("address normal string: %s\n", address.String())
+		fmt.Printf("address full string: %s\n", address.StringLong())
+		fmt.Printf("address full string len: %d\n", len(address))
 	})
 }
 
 func TestAptosTransfer(t *testing.T) {
-	// 创建客户端
+	// Create client
 	client, err := aptos.NewClient(aptos.DevnetConfig)
-	assert.NoError(t, err, "创建客户端失败")
+	assert.NoError(t, err, "Failed to create client")
 
-	// 创建测试账户
+	// Create test accounts with alice
 	alice, err := aptos.NewEd25519Account()
-	assert.NoError(t, err, "创建 alice 账户失败")
-
+	assert.NoError(t, err, "Failed to create alice account")
+	// Create test accounts with bob
 	bob, err := aptos.NewEd25519Account()
-	assert.NoError(t, err, "创建 bob 账户失败")
+	assert.NoError(t, err, "Failed to create bob account")
 
-	// 为 alice 账户充值
+	// Fund alice account
 	const fundAmount = 100_000_000
 	err = client.Fund(alice.Address, fundAmount)
-	assert.NoError(t, err, "为 alice 充值失败")
-	t.Logf("已为账户 %s 充值 %d APT", alice.Address, fundAmount)
+	assert.NoError(t, err, "Failed to fund alice account")
+	t.Logf("Funded account %s with %d APT", alice.Address, fundAmount)
 
-	// 获取初始余额
 	aliceBalance, err := client.AccountAPTBalance(alice.Address)
-	assert.NoError(t, err, "获取 alice 余额失败")
-	assert.Equal(t, uint64(fundAmount), aliceBalance, "alice 初始余额不正确")
-	t.Logf("Alice 初始余额: %d APT", aliceBalance)
+	assert.NoError(t, err, "Failed to get alice balance")
+	assert.Equal(t, uint64(fundAmount), aliceBalance, "Incorrect initial balance for alice")
+	t.Logf("Alice initial balance: %d APT", aliceBalance)
 
-	// 构建转账交易
 	const transferAmount = 1_000
 	transferPayload, err := aptos.CoinTransferPayload(nil, bob.Address, transferAmount)
-	assert.NoError(t, err, "构建转账 payload 失败")
+	assert.NoError(t, err, "build payload fail")
 
-	// 构建原始交易
+	// BuildTransaction
 	rawTxn, err := client.BuildTransaction(alice.AccountAddress(),
 		aptos.TransactionPayload{Payload: transferPayload})
-	assert.NoError(t, err, "构建交易失败")
+	assert.NoError(t, err, "BuildTransaction fail")
 
-	// 模拟交易
+	rawTxn1111, _ := json.Marshal(rawTxn)
+	fmt.Printf("rawTxn1111: %s\n", rawTxn1111)
+
 	simulationResult, err := client.SimulateTransaction(rawTxn, alice)
-	assert.NoError(t, err, "模拟交易失败")
-	assert.Equal(t, "Executed successfully", simulationResult[0].VmStatus, "交易模拟状态不正确")
-	t.Logf("交易模拟成功，预计 gas 费用: %d", simulationResult[0].GasUsed)
+	assert.NoError(t, err, "simulationResult fail")
+	assert.Equal(t, "Executed simulationResult successfully", simulationResult[0].VmStatus, "simulationResult fail")
+	t.Logf("simulationResult success, emit gas fee: %d", simulationResult[0].GasUsed)
 
-	// 签名交易
 	signedTxn, err := rawTxn.SignedTransaction(alice)
-	assert.NoError(t, err, "签名交易失败")
+	assert.NoError(t, err, "SignedTransaction fail ")
+	signedTxn11, _ := json.Marshal(signedTxn)
+	fmt.Printf("signedTxn11: %s\n", signedTxn11)
 
-	// 提交交易
 	submitResult, err := client.SubmitTransaction(signedTxn)
-	assert.NoError(t, err, "提交交易失败")
+	assert.NoError(t, err, "submitResult fail")
 
-	// 等待交易完成
 	txn, err := client.WaitForTransaction(submitResult.Hash)
-	assert.NoError(t, err, "等待交易完成失败")
-	assert.True(t, txn.Success, "交易执行失败")
-	t.Logf("交易已确认，交易哈希: %s", submitResult.Hash)
+	assert.NoError(t, err, "WaitForTransaction fail")
+	assert.True(t, txn.Success, "WaitForTransaction fail")
+	t.Logf("WaitForTransaction success, tx hash: %s", submitResult.Hash)
 
-	// 验证最终余额
 	newAliceBalance, err := client.AccountAPTBalance(alice.Address)
-	assert.NoError(t, err, "获取 alice 新余额失败")
+	assert.NoError(t, err, "newAliceBalance fail")
 
 	bobBalance, err := client.AccountAPTBalance(bob.Address)
-	assert.NoError(t, err, "获取 bob 余额失败")
+	assert.NoError(t, err, "bobBalance fail")
 
-	// 验证转账结果（需要考虑 gas 费用）
-	assert.Less(t, newAliceBalance, aliceBalance-transferAmount, "alice 余额扣除不正确")
-	assert.Equal(t, uint64(transferAmount), bobBalance, "bob 余额增加不正确")
-	t.Logf("转账后 Alice 余额: %d APT", newAliceBalance)
-	t.Logf("转账后 Bob 余额: %d APT", bobBalance)
-	t.Logf("实际 gas 费用: %d", aliceBalance-transferAmount-newAliceBalance)
+	assert.Less(t, newAliceBalance, aliceBalance-transferAmount, "newAliceBalance fail")
+	assert.Equal(t, uint64(transferAmount), bobBalance, "bobBalance fail")
+	t.Logf("transfer newAliceBalance: %d APT", newAliceBalance)
+	t.Logf("transfer Bob fee: %d APT", bobBalance)
+	t.Logf("normal gas fee: %d", aliceBalance-transferAmount-newAliceBalance)
 }

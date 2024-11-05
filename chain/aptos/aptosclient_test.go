@@ -11,12 +11,13 @@ import (
 const (
 	baseURL   = "https://api.mainnet.aptoslabs.com/"
 	apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
+	network   = Mainnet
 	withDebug = true
 )
 
 func TestClient_GetNodeInfo(t *testing.T) {
 	// Initialize client
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
 
@@ -66,7 +67,7 @@ func TestRestyClient_GetAccount(t *testing.T) {
 		emptyAccount   = ""
 	)
 
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "failed to initialize aptos client")
 
 	t.Run("Valid Account", func(t *testing.T) {
@@ -114,7 +115,7 @@ func TestRestyClient_GetAccount(t *testing.T) {
 }
 
 func TestRestyClient_GetGasPrice(t *testing.T) {
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "failed to initialize aptos client")
 
 	t.Run("Get Gas Price Successfully", func(t *testing.T) {
@@ -153,7 +154,7 @@ func TestRestyClient_GetGasPrice(t *testing.T) {
 	})
 
 	t.Run("Invalid Client", func(t *testing.T) {
-		invalidClient, err := NewAptosClientAll("https://invalid.url", apiKey, withDebug)
+		invalidClient, err := NewAptosHttpClientAll("https://invalid.url", apiKey, withDebug)
 		assert.NoError(t, err)
 
 		gasPrice, err := invalidClient.GetGasPrice()
@@ -169,7 +170,7 @@ func TestClient_GetTransactionByHash(t *testing.T) {
 		validTxHash = "0x43531969ff8e93de962ea65e5609c2b05de3aa5e78933d8925613e75d3d53772"
 	)
 
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
 
@@ -250,7 +251,7 @@ func TestClient_GetBlockByHeight(t *testing.T) {
 	)
 
 	// Initialize client
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
 
@@ -295,15 +296,13 @@ func TestClient_GetBlockByHeight(t *testing.T) {
 }
 
 func TestRestyClient_GetTransactionByHash(t *testing.T) {
-	// 测试常量
 	const (
 		validTxHash   = "0x43531969ff8e93de962ea65e5609c2b05de3aa5e78933d8925613e75d3d53772"
 		invalidTxHash = "0xinvalid_hash"
 		emptyTxHash   = ""
 	)
 
-	// 初始化客户端
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "failed to initialize aptos client")
 
 	t.Run("Valid Transaction Hash", func(t *testing.T) {
@@ -312,7 +311,6 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// 验证基本字段
 		t.Run("Basic Fields", func(t *testing.T) {
 			assert.NotZero(t, resp.Version)
 			assert.Equal(t, validTxHash, resp.Hash)
@@ -324,7 +322,6 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 			assert.NotEmpty(t, resp.AccumulatorRootHash)
 		})
 
-		// 验证交易详情
 		t.Run("Transaction Details", func(t *testing.T) {
 			assert.NotEmpty(t, resp.Sender)
 			assert.NotZero(t, resp.SequenceNumber)
@@ -335,13 +332,11 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 			assert.NotEmpty(t, resp.Type)
 		})
 
-		// 验证 Payload
 		t.Run("Payload", func(t *testing.T) {
 			assert.NotEmpty(t, resp.Payload.Function)
 			assert.NotEmpty(t, resp.Payload.Type)
 		})
 
-		// 验证 Changes
 		t.Run("Changes", func(t *testing.T) {
 			if len(resp.Changes) > 0 {
 				change := resp.Changes[0]
@@ -351,7 +346,6 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 			}
 		})
 
-		// 验证 Events
 		t.Run("Events", func(t *testing.T) {
 			if len(resp.Events) > 0 {
 				event := resp.Events[0]
@@ -361,7 +355,6 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 			}
 		})
 
-		// 输出详细日志
 		t.Run("Log Details", func(t *testing.T) {
 			t.Log("Transaction Details:")
 			t.Logf("Version: %d", resp.Version)
@@ -392,7 +385,6 @@ func TestRestyClient_GetTransactionByHash(t *testing.T) {
 		})
 	})
 
-	// 错误测试用例
 	t.Run("Error Cases", func(t *testing.T) {
 		t.Run("Invalid Hash", func(t *testing.T) {
 			resp, err := client.GetTransactionByHash(invalidTxHash)
@@ -430,7 +422,7 @@ func TestClient_GetTransactionByVersion(t *testing.T) {
 	)
 
 	// Initialize client
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
 
@@ -519,7 +511,7 @@ func TestClient_GetTransactionByVersionRange(t *testing.T) {
 	)
 
 	// Initialize client
-	client, err := NewAptosClientAll(baseURL, apiKey, withDebug)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
 	assert.NoError(t, err, "client initialization failed")
 	assert.NotNil(t, client, "client should not be nil")
 
