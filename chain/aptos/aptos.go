@@ -25,7 +25,7 @@ const ChainName = "Aptos"
 const ResourceTypeAPT = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
 
 type ChainAdaptor struct {
-	aptosHttpClient *RestyClient
+	aptosHttpClient AptClient
 	aptosClient     *aptos.Client
 }
 
@@ -67,6 +67,8 @@ func (c *ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*acc
 	}
 
 	response.Msg = "Support this chain"
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Support = true
 	return response, nil
 }
 
@@ -93,6 +95,7 @@ func (c *ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*acco
 		return nil, err
 	}
 
+	response.Code = common2.ReturnCode_SUCCESS
 	response.Msg = "convert address success"
 	response.Address = accountAddress.String()
 	return response, nil
@@ -184,6 +187,8 @@ func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accou
 		if req.ViewTx {
 
 		}
+		response.Code = common2.ReturnCode_SUCCESS
+		response.Msg = "GetBlockByNumber success"
 		response.Height = int64(nodeInfo.BlockHeight)
 		// TODO: Transactionsdasda
 		response.Transactions = nil
@@ -462,10 +467,9 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 		response.Msg = err.Error()
 		return nil, err
 	}
-	//TODO fromAddrList toAddrsList
-	var fromAddrList []*account.Address
-	var toAddrsList []*account.Address
-	var valueList []*account.Value
+	//var fromAddrList []*account.Address
+	//var toAddrsList []*account.Address
+	//var valueList []*account.Value
 	var txStatus account.TxStatus
 	if tx.Success {
 		txStatus = account.TxStatus_Success
@@ -478,18 +482,23 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 
 	txMessage := &account.TxMessage{
 		Hash:  tx.Hash,
-		Froms: fromAddrList,
-		//TODO to
-		Tos: toAddrsList,
-		//TODO Value
-		Values: valueList,
+		Index: uint32(tx.SequenceNumber),
+		Froms: []*account.Address{{
+			Address: tx.Sender,
+		}},
+		Tos: []*account.Address{{
+			Address: tx.Payload.Arguments[0].(string),
+		}},
+		Values: []*account.Value{{
+			Value: tx.Payload.Arguments[1].(string),
+		}},
 		Fee:    strconv.FormatUint(totalFee, 10),
 		Status: txStatus,
-		Type:   0,
-		Height: strconv.FormatUint(tx.Version, 10),
+		Type:   determineTransactionType(tx.Payload.Function),
+		// Height: strconv.FormatUint(tx.Version, 10),
 		// ContractAddress:
 		Datetime: strconv.FormatUint(tx.Timestamp, 10),
-		//Data:     hexutils.BytesToHex(tx.),
+		Data:     serializePayload(tx.Payload),
 	}
 	response.Code = common2.ReturnCode_SUCCESS
 	response.Msg = "GetTxByHash success"
@@ -540,21 +549,31 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 	}
 
 	for _, tx := range txs {
+		blockByVersion, err := c.aptosHttpClient.GetBlockByVersion(tx.Version)
+		if err != nil {
+			err := fmt.Errorf("GetBlockByRange GetBlockByVersion failed: %w", err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+
 		blockHeader := &account.BlockHeader{
-			Hash: tx.Hash,
+			Hash: blockByVersion.BlockHash,
 			//ParentHash:  tx.StateRootHash,
 			//Root:        tx.StateRootHash,
 			TxHash:      tx.Hash,
 			ReceiptHash: tx.EventRootHash,
-			//Number:      tx.Version,
-			GasLimit: tx.MaxGasAmount,
-			GasUsed:  tx.GasUsed,
-			Time:     tx.Timestamp,
-			Extra:    convertExtraInfo(tx),
-			Nonce:    strconv.FormatUint(tx.SequenceNumber, 10),
+			Number:      strconv.FormatUint(blockByVersion.BlockHeight, 10),
+			GasLimit:    tx.MaxGasAmount,
+			GasUsed:     tx.GasUsed,
+			Time:        blockByVersion.BlockTimestamp,
+			Extra:       convertExtraInfo(tx),
+			Nonce:       strconv.FormatUint(tx.SequenceNumber, 10),
 		}
 		response.BlockHeader = append(response.BlockHeader, blockHeader)
 	}
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "GetBlockByRange success"
 	return response, nil
 }
 
@@ -914,6 +933,7 @@ func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionReq
 	}
 
 	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "VerifySignedTransaction success"
 	response.Verify = isValid
 	return response, nil
 }
@@ -983,4 +1003,19 @@ func validateChainAndNetwork(chain, network string) (bool, string) {
 	//	return false, "invalid network"
 	//}
 	return true, ""
+}
+
+func determineTransactionType(function string) int32 {
+	if strings.Contains(function, "transfer") {
+		return 1
+	}
+	return 0
+}
+
+func serializePayload(payload Payload) string {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }

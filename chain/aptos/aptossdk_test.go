@@ -115,9 +115,9 @@ func TestValidateAptosAddress(t *testing.T) {
 }
 
 func TestAptosTransfer(t *testing.T) {
-	// Create client
+	// Create aptclient
 	client, err := aptos.NewClient(aptos.DevnetConfig)
-	assert.NoError(t, err, "Failed to create client")
+	assert.NoError(t, err, "Failed to create aptclient")
 
 	// Create test accounts with alice
 	alice, err := aptos.NewEd25519Account()

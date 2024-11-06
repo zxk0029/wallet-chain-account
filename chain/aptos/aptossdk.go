@@ -30,7 +30,7 @@ func NewAptosClient(networkConfig string) (*aptos.Client, error) {
 
 	client, err := NewAptosClientEnv(aptosEnv)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Aptos client: %w", err)
+		return nil, fmt.Errorf("failed to create Aptos aptclient: %w", err)
 	}
 
 	return client, nil
