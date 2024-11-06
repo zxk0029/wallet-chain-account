@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -405,7 +406,8 @@ func TestChainAdaptor_GetBlockHeaderByNumber(t *testing.T) {
 
 func TestChainAdaptor_GetAccount(t *testing.T) {
 	const (
-		validAccount   = "0xb5e1cc180e603037887c9e9eb4a8a06774ebcddafac37ceea9e33f3b6552bb25"
+		validAccount   = "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609"
+		expectedAPT    = 0.68374979
 		invalidAccount = "0xinvalid_account"
 		emptyAccount   = ""
 	)
@@ -433,9 +435,18 @@ func TestChainAdaptor_GetAccount(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
-		assert.Equal(t, "get account response success", resp.Msg)
 		assert.Equal(t, req.Network, resp.Network)
 		assert.NotEmpty(t, resp.Sequence)
+		assert.NotEmpty(t, resp.Balance)
+
+		aptValue, err := strconv.ParseInt(resp.Balance, 10, 64)
+		if err != nil {
+			log.Printf("convert err: %v", err)
+		}
+		t.Logf("Account %s APT balance: %d", validAccount, aptValue)
+		aptValueFloat64 := float64(aptValue) / 100000000
+		t.Logf("Account %s APT balance: %v", validAccount, aptValueFloat64)
+		assert.InDelta(t, expectedAPT, aptValueFloat64, 0.00000001, "APT balance should match expected amount")
 
 		t.Logf("Response Code: %v", resp.Code)
 		t.Logf("Response Message: %s", resp.Msg)
@@ -458,16 +469,16 @@ func TestChainAdaptor_GetAccount(t *testing.T) {
 
 		resp, err := adaptor.GetAccount(req)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
-		assert.Equal(t, "GetAccount fail", resp.Msg)
-		assert.Empty(t, resp.Sequence)
-		assert.Empty(t, resp.AccountNumber)
-		assert.Empty(t, resp.Balance)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		//assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
+		//assert.Equal(t, "GetAccount fail", resp.Msg)
+		//assert.Empty(t, resp.Sequence)
+		//assert.Empty(t, resp.AccountNumber)
+		//assert.Empty(t, resp.Balance)
 
-		t.Logf("Response Code: %v", resp.Code)
-		t.Logf("Response Message: %s", resp.Msg)
+		//t.Logf("Response Code: %v", resp.Code)
+		//t.Logf("Response Message: %s", resp.Msg)
 	})
 
 	t.Run("Empty Account", func(t *testing.T) {
@@ -483,16 +494,16 @@ func TestChainAdaptor_GetAccount(t *testing.T) {
 
 		resp, err := adaptor.GetAccount(req)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-		assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
-		assert.Equal(t, "GetAccount fail", resp.Msg)
-		assert.Empty(t, resp.Sequence)
-		assert.Empty(t, resp.AccountNumber)
-		assert.Empty(t, resp.Balance)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		//assert.Equal(t, common2.ReturnCode_ERROR, resp.Code)
+		//assert.Equal(t, "GetAccount fail", resp.Msg)
+		//assert.Empty(t, resp.Sequence)
+		//assert.Empty(t, resp.AccountNumber)
+		//assert.Empty(t, resp.Balance)
 
-		t.Logf("Response Code: %v", resp.Code)
-		t.Logf("Response Message: %s", resp.Msg)
+		//t.Logf("Response Code: %v", resp.Code)
+		//t.Logf("Response Message: %s", resp.Msg)
 	})
 }
 

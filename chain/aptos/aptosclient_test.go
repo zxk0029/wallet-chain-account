@@ -12,7 +12,7 @@ const (
 	baseURL   = "https://api.mainnet.aptoslabs.com/"
 	apiKey    = "aptoslabs_7Gd8hUMMp85_JxF2SXZCDcmeP4tjuuBXjwFwqyY6nTFup"
 	network   = Mainnet
-	withDebug = true
+	withDebug = false
 )
 
 func TestClient_GetNodeInfo(t *testing.T) {
@@ -597,5 +597,32 @@ func TestClient_GetTransactionByVersionRange(t *testing.T) {
 				t.Logf("Number of Changes: %d", len(tx.Changes))
 			}
 		}
+	})
+}
+
+func TestRestyClient_GetAccountBalance(t *testing.T) {
+	const (
+		validAddress    = "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609"
+		expectedAPT     = 0.68374979
+		ResourceTypeAPT = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+	)
+	client, err := NewAptosHttpClientAll(baseURL, apiKey, withDebug)
+	assert.NoError(t, err, "client initialization failed")
+	assert.NotNil(t, client, "client should not be nil")
+
+	t.Run("Get APT Balance", func(t *testing.T) {
+		address := validAddress
+		resourceType := ResourceTypeAPT
+
+		balance, err := client.GetAccountBalance(address, resourceType)
+		t.Logf("Account %s APT balance: %d", address, balance)
+
+		assert.NoError(t, err, "should not return error")
+		assert.NotZero(t, balance, "balance should not be zero")
+
+		aptValue := float64(balance) / 100000000
+		t.Logf("Account %s APT balance: %.8f", address, aptValue)
+
+		assert.InDelta(t, expectedAPT, aptValue, 0.00000001, "APT balance should match expected amount")
 	})
 }

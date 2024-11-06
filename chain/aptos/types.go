@@ -136,3 +136,12 @@ type NodeInfo struct {
 	BlockHeight         uint64 `json:"block_height,string"`
 	GitHash             string `json:"git_hash"`
 }
+
+type AccountBalanceResponse struct {
+	Type string `json:"type"`
+	Data struct {
+		Coin struct {
+			Value string `json:"value"`
+		} `json:"coin"`
+	} `json:"data"`
+}

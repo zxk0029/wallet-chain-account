@@ -22,6 +22,7 @@ import (
 )
 
 const ChainName = "Aptos"
+const ResourceTypeAPT = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
 
 type ChainAdaptor struct {
 	aptosHttpClient *RestyClient
@@ -312,10 +313,19 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 		response.Msg = err.Error()
 		return nil, err
 	}
+	accountBalance, err := c.aptosHttpClient.GetAccountBalance(req.Address, ResourceTypeAPT)
+	if err != nil {
+		err := fmt.Errorf("GetAccount GetAccountBalance failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+
 	response.Code = common2.ReturnCode_SUCCESS
 	response.Msg = "GetAccount success"
 	response.Sequence = strconv.FormatUint(accountResponse.SequenceNumber, 10)
 	response.Network = req.Network
+	response.Balance = strconv.FormatUint(accountBalance, 10)
 	return response, nil
 }
 

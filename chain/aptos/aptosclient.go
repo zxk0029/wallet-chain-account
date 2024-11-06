@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -45,8 +46,9 @@ const (
 	// API Url
 	pathNodeInfo = baseAPIPath + "/"
 
-	pathGetSequence = baseAPIPath + "/accounts/%s"
-	pathGasPrice    = baseAPIPath + "/estimate_gas_price"
+	pathGetSequence     = baseAPIPath + "/accounts/%s"
+	pathAccountResource = baseAPIPath + "/accounts/%s/resource/%s"
+	pathGasPrice        = baseAPIPath + "/estimate_gas_price"
 
 	pathTransactions = baseAPIPath + "/transactions"
 	pathTxByAddr     = baseAPIPath + "/accounts/%s/transactions"
@@ -324,6 +326,37 @@ func (c *RestyClient) GetTransactionByVersionRange(startVersion, endVersion uint
 	}
 
 	return transactions, nil
+}
+
+func (c *RestyClient) GetAccountBalance(address string, resourceType string) (uint64, error) {
+	if address == "" {
+		return 0, fmt.Errorf("account address cannot be empty")
+	}
+	if resourceType == "" {
+		return 0, fmt.Errorf("resource type cannot be empty")
+	}
+
+	path := fmt.Sprintf(pathAccountResource, address, resourceType)
+	response := &AccountBalanceResponse{}
+
+	resp, err := c.client.R().
+		SetResult(response).
+		Get(path)
+
+	if err != nil {
+		return 0, fmt.Errorf("request failed: %w", err)
+	}
+
+	if resp.IsError() {
+		return 0, fmt.Errorf("failed to get account balance: %w", errHTTPError)
+	}
+
+	balance, err := strconv.ParseUint(response.Data.Coin.Value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse balance: %w", err)
+	}
+
+	return balance, nil
 }
 
 func IsValidAddress(inputAddr string) bool {
