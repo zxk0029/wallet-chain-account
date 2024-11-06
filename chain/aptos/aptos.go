@@ -375,8 +375,40 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 		err := fmt.Errorf("SendTx validateChainAndNetwork fail, err msg = %s", msg)
 		return response, err
 	}
-	//TODO implement me
-	panic("implement me")
+	rawTx := req.RawTx
+
+	rawTxByteList, err := base64.StdEncoding.DecodeString(rawTx)
+	if err != nil {
+		err := fmt.Errorf("SendTx DecodeString rawTx failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+
+	signedTxListDes := bcs.NewDeserializer(rawTxByteList)
+	signedTx := &aptos.SignedTransaction{
+		Transaction: &aptos.RawTransaction{},
+		Authenticator: &aptos.TransactionAuthenticator{
+			Variant: aptos.TransactionAuthenticatorEd25519,
+			Auth: &crypto.Ed25519Authenticator{
+				PubKey: &crypto.Ed25519PublicKey{},
+				Sig:    &crypto.Ed25519Signature{},
+			},
+		},
+	}
+	signedTx.UnmarshalBCS(signedTxListDes)
+
+	submitTransactionResponse, err := c.aptosClient.SubmitTransaction(signedTx)
+	if err != nil {
+		err := fmt.Errorf("SendTx SubmitTransaction rawTx failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "SubmitTransaction success"
+	response.TxHash = submitTransactionResponse.Hash
+	return response, nil
 }
 
 func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
@@ -520,58 +552,72 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 		err := fmt.Errorf("GetBlockByRange validateChainAndNetwork fail, err msg = %s", msg)
 		return response, err
 	}
-	startVersion, err := strconv.ParseUint(req.Start, 10, 64)
+	startBlock, err := strconv.ParseUint(req.Start, 10, 64)
 	if err != nil {
 		err := fmt.Errorf("GetBlockByRange startVersion failed: %w", err)
 		log.Error("err", err)
 		response.Msg = err.Error()
 		return nil, err
 	}
-	endVersion, err := strconv.ParseUint(req.End, 10, 64)
+	endBlock, err := strconv.ParseUint(req.End, 10, 64)
 	if err != nil {
 		err := fmt.Errorf("GetBlockByRange endVersion failed: %w", err)
 		log.Error("err", err)
 		response.Msg = err.Error()
 		return nil, err
 	}
-	if startVersion > endVersion {
-		err := fmt.Errorf("GetBlockByRange startVersion > endVersion failed: %w", err)
+	if startBlock > endBlock {
+		err := fmt.Errorf("GetBlockByRange startBlock > endBlock failed: %w", err)
 		log.Error("err", err)
 		response.Msg = err.Error()
 		return nil, err
 	}
-	txs, err := c.aptosHttpClient.GetTransactionByVersionRange(startVersion, endVersion)
-	if err != nil {
-		err := fmt.Errorf("GetBlockByRange GetTransactionByVersionRange failed: %w", err)
-		log.Error("err", err)
-		response.Msg = err.Error()
-		return nil, err
-	}
+	response.BlockHeader = make([]*account.BlockHeader, 0, (endBlock-startBlock)*5)
 
-	for _, tx := range txs {
-		blockByVersion, err := c.aptosHttpClient.GetBlockByVersion(tx.Version)
+	for height := startBlock; height <= endBlock; height++ {
+		block, err := c.aptosHttpClient.GetBlockByHeight(height)
 		if err != nil {
-			err := fmt.Errorf("GetBlockByRange GetBlockByVersion failed: %w", err)
+			err := fmt.Errorf("GetBlockByRange GetBlockByHeight failed at height %d: %w", height, err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+		startVersion := block.FirstVersion
+		endVersion := block.LastVersion
+		txs, err := c.aptosHttpClient.GetTransactionByVersionRange(startVersion, endVersion)
+		if err != nil {
+			err := fmt.Errorf("GetBlockByRange GetTransactionByVersionRange failed: %w", err)
 			log.Error("err", err)
 			response.Msg = err.Error()
 			return nil, err
 		}
 
-		blockHeader := &account.BlockHeader{
-			Hash: blockByVersion.BlockHash,
-			//ParentHash:  tx.StateRootHash,
-			//Root:        tx.StateRootHash,
-			TxHash:      tx.Hash,
-			ReceiptHash: tx.EventRootHash,
-			Number:      strconv.FormatUint(blockByVersion.BlockHeight, 10),
-			GasLimit:    tx.MaxGasAmount,
-			GasUsed:     tx.GasUsed,
-			Time:        blockByVersion.BlockTimestamp,
-			Extra:       convertExtraInfo(tx),
-			Nonce:       strconv.FormatUint(tx.SequenceNumber, 10),
+		for _, tx := range txs {
+			blockByVersion, err := c.aptosHttpClient.GetBlockByVersion(tx.Version)
+			if err != nil {
+				err := fmt.Errorf("GetBlockByRange GetBlockByVersion failed: %w", err)
+				log.Error("err", err)
+				response.Msg = err.Error()
+				return nil, err
+			}
+
+			blockHeader := &account.BlockHeader{
+				Hash: blockByVersion.BlockHash,
+				//ParentHash:  tx.StateRootHash,
+				//Root:        tx.StateRootHash,
+				TxHash:      tx.Hash,
+				ReceiptHash: tx.EventRootHash,
+				Number:      strconv.FormatUint(blockByVersion.BlockHeight, 10),
+				GasLimit:    tx.MaxGasAmount,
+				GasUsed:     tx.GasUsed,
+				Time:        blockByVersion.BlockTimestamp,
+				Extra:       convertExtraInfo(tx),
+				Nonce:       strconv.FormatUint(tx.SequenceNumber, 10),
+			}
+			response.BlockHeader = append(response.BlockHeader, blockHeader)
 		}
-		response.BlockHeader = append(response.BlockHeader, blockHeader)
 	}
+
 	response.Code = common2.ReturnCode_SUCCESS
 	response.Msg = "GetBlockByRange success"
 	return response, nil
