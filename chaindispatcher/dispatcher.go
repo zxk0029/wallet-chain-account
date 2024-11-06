@@ -2,14 +2,14 @@ package chaindispatcher
 
 import (
 	"context"
+	"github.com/dapplink-labs/wallet-chain-account/chain/cosmos"
 	"runtime/debug"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/chain/ethereum"
@@ -36,10 +36,12 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 	}
 	chainAdaptorFactoryMap := map[string]func(conf *config.Config) (chain.IChainAdaptor, error){
 		ethereum.ChainName: ethereum.NewChainAdaptor,
+		cosmos.ChainName:   cosmos.NewChainAdaptor,
 	}
 
 	supportedChains := []string{
 		ethereum.ChainName,
+		cosmos.ChainName,
 	}
 
 	for _, c := range conf.Chains {
@@ -111,8 +113,14 @@ func (d *ChainDispatcher) ConvertAddress(ctx context.Context, request *account.C
 }
 
 func (d *ChainDispatcher) ValidAddress(ctx context.Context, request *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	resp := d.preHandler(request)
+	if resp != nil {
+		return &account.ValidAddressResponse{
+			Code: common.ReturnCode_ERROR,
+			Msg:  "valid address error at pre handle",
+		}, nil
+	}
+	return d.registry[request.Chain].ValidAddress(request)
 }
 
 func (d *ChainDispatcher) GetBlockByNumber(ctx context.Context, request *account.BlockNumberRequest) (*account.BlockResponse, error) {

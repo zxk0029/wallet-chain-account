@@ -20,6 +20,7 @@ type RPC struct {
 
 type Node struct {
 	RPCs         []*RPC `yaml:"rpcs"`
+	RestUrl      string `yaml:"rest_url"`
 	DataApiUrl   string `yaml:"data_api_url"`
 	DataApiKey   string `yaml:"data_api_key"`
 	DataApiToken string `yaml:"data_api_token"`

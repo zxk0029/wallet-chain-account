@@ -1,12 +1,18 @@
 package cosmos
 
 import (
+	"bytes"
 	"context"
-	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
+
+	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
-	cometypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -15,50 +21,21 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	sdktx "github.com/cosmos/cosmos-sdk/types/tx"
-	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/dapplink-labs/wallet-chain-account/common/retry"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"time"
+
+	"github.com/dapplink-labs/wallet-chain-account/common/retry"
+	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 )
 
 const (
-	defaultDialTimeout    = 5 * time.Second
+	defaultDialTimeout    = 30 * time.Second
 	defaultDialAttempts   = 5
 	defaultRequestTimeout = 10 * time.Second
 )
-
-//type CosmosClient interface {
-//	GetAccount(ctx context.Context, addr string) (*authv1beta1.QueryAccountResponse, error)
-//
-//	GetBalance(ctx context.Context, coin, addr string) (*types.Coin, error)
-//
-//	GetTxByHash(ctx context.Context, hash string) (*tx.GetTxResponse, error)
-//
-//	GetTxByEvent(ctx context.Context, event []string, page, limit uint64) (*tx.GetTxsEventResponse, error)
-//
-//	SendTx(ctx context.Context, fromAddr, toAddr, coin string, amount int64) (*banktypes.MsgSendResponse, error)
-//
-//	GetAddressFromPubKey(key []byte) string
-//
-//	BroadcastTx(ctx context.Context, txByte []byte) (*tx.BroadcastTxResponse, error)
-//	// block
-//	GetBlock(ctx context.Context, height *int64) (*ctypes.ResultBlock, error)
-//	////
-//	//Header(ctx context.Context, height *int64) (*ctypes.ResultHeader, error)
-//	////
-//	//BlockByHash(hash []byte) (*ctypes.ResultBlock, error)
-//	////
-//	//BlockchainInfo(minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error)
-//	////
-//	//Tx(hash []byte, prove bool) (*ctypes.ResultTx, error)
-//
-//	Close() error
-//}
 
 type CosmosClient struct {
 	context client.Context
@@ -70,6 +47,65 @@ type CosmosClient struct {
 	txServiceClient sdktx.ServiceClient
 	authClient      authv1beta1.QueryClient
 	bankKeeper      keeper.BaseKeeper
+}
+
+type BlockResponse struct {
+	BlockId struct {
+		Hash string `json:"hash"`
+	} `json:"block_id"`
+	Block struct {
+		Header struct {
+			Height string `json:"height"`
+			Time   string `json:"time"`
+		} `json:"header"`
+		Data struct {
+			Txs []string `json:"txs"`
+		} `json:"data"`
+	} `json:"block"`
+}
+
+type DecodeTxRequest struct {
+	Tx string `json:"tx_bytes"`
+}
+
+type DecodeTxResponse struct {
+	Tx struct {
+		Body struct {
+			Messages []banktypes.MsgSend `json:"messages"`
+		} `json:"body"`
+	} `json:"tx"`
+	Response struct {
+		Height    string `json:"height"`
+		Txhash    string `json:"txhash"`
+		GasWanted string `json:"gas_wanted"`
+		GasUsed   string `json:"gas_used"`
+	} `json:"tx_response"`
+}
+
+type TxResponse struct {
+	//Tx struct {
+	//	Body struct {
+	//		Messages []string `json:"messages"`
+	//	} `json:"body"`
+	//} `json:"tx"`
+	Response struct {
+		Height    string     `json:"height"`
+		Txhash    string     `json:"txhash"`
+		GasWanted string     `json:"gas_wanted"`
+		GasUsed   string     `json:"gas_used"`
+		Events    []*TxEvent `json:"events"`
+		Timestamp string     `json:"timestamp"`
+	} `json:"tx_response"`
+}
+
+type TxEvent struct {
+	Type       string              `json:"type"`
+	Attributes []*TxEventAttribute `json:"attributes"`
+}
+
+type TxEventAttribute struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 func DialCosmosClient(ctx context.Context, nodeUrl string) (*CosmosClient, error) {
@@ -135,11 +171,37 @@ func (c *CosmosClient) GetBalance(coin, addr string) (*sdk.Coin, error) {
 	return resp.GetBalance(), nil
 }
 
-func (c *CosmosClient) GetTxByHash(hash string) (*sdktx.GetTxResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
-	defer cancel()
+func (c *CosmosClient) GetTxByHash(restURL, hash string) (*TxResponse, error) {
+	//ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	//defer cancel()
 
-	return c.txServiceClient.GetTx(ctx, &sdktx.GetTxRequest{Hash: hash})
+	//response, err := c.txServiceClient.GetTx(ctx, &sdktx.GetTxRequest{Hash: hash})
+	//if err != nil {
+	//	log.Error("failed to get block: %v", err)
+	//	return nil, err
+	//}
+
+	resp, err := http.Get(fmt.Sprintf("%s/cosmos/tx/v1beta1/txs/%s", restURL, hash))
+	if err != nil {
+		log.Error("failed to get block: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("failed to read response body: %v", err)
+		return nil, err
+	}
+
+	var txResponse TxResponse
+	err = json.Unmarshal(body, &txResponse)
+	if err != nil {
+		log.Error("failed to unmarshal response: %v", err)
+		return nil, err
+	}
+
+	return &txResponse, nil
 }
 
 func (c *CosmosClient) GetTxByEvent(event []string, page, limit uint64) (*sdktx.GetTxsEventResponse, error) {
@@ -219,7 +281,7 @@ func (c *CosmosClient) SendTx(fromAddr, toAddr, coin string, amount int64) (*ban
 }
 
 func (c *CosmosClient) GetAddressFromPubKey(key []byte) string {
-	// todo check
+	// todo check ed255192
 	pub := ed255192.PubKey{Key: key}
 	return pub.Address().String()
 }
@@ -234,63 +296,99 @@ func (c *CosmosClient) BroadcastTx(txByte []byte) (*sdktx.BroadcastTxResponse, e
 	})
 }
 
-func (c *CosmosClient) GetBlock(height *int64) (*ctypes.ResultBlock, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
-	defer cancel()
+// https://cosmos-rest.publicnode.com/cosmos/tx/v1beta1/txs/block/22879895
+func (c *CosmosClient) GetBlock(restURL string, height int64) (*BlockResponse, error) {
+	//ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	//defer cancel()
+	//
+	//txsRequest := &sdktx.GetBlockWithTxsRequest{
+	//	Height: height,
+	//}
+	//result, err := c.txServiceClient.GetBlockWithTxs(ctx, txsRequest)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//decodedHash, err := base64.StdEncoding.DecodeString(string(result.Block.Data.Txs[0]))
+	//if err != nil {
+	//	log.Error("解码失败: %v", err)
+	//}
+	//fmt.Printf("解码前的二进制数据: %x\n", string(result.Block.Data.Txs[0]))
+	//fmt.Printf("解码后的二进制数据: %x\n", string(decodedHash))
+	//
+	//return nil, nil
 
-	result, err := c.rpchttp.Block(ctx, height)
+	resp, err := http.Get(fmt.Sprintf("%s/cosmos/tx/v1beta1/txs/block/%d", restURL, height))
 	if err != nil {
+		log.Error("failed to get block: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("failed to read response body: %v", err)
 		return nil, err
 	}
 
-	return result, nil
+	var blockResp BlockResponse
+	err = json.Unmarshal(body, &blockResp)
+	if err != nil {
+		log.Error("failed to unmarshal response: %v", err)
+		return nil, err
+	}
+	decodedHash, err := base64.StdEncoding.DecodeString(blockResp.BlockId.Hash)
+	if err != nil {
+		log.Error("解码失败: %v", err)
+	}
+	fmt.Printf("解码前的二进制数据: %x\n", blockResp.BlockId.Hash)
+	fmt.Printf("解码后的二进制数据: %x\n", string(decodedHash))
+	blockResp.BlockId.Hash = fmt.Sprintf("%x", string(decodedHash))
+	return &blockResp, nil
 }
 
-func (c *CosmosClient) DecodeBlockTx(block *cometypes.Block) ([]*account.BlockInfoTransactionList, error) {
+func (c *CosmosClient) DecodeBlockTx(restURL string, block *BlockResponse) ([]*account.BlockInfoTransactionList, error) {
 	var blockTransactions []*account.BlockInfoTransactionList
 
-	// 获取区块的总 Gas 使用量
-	//totalGas := uint64(0)
-	//for _, txHash := range block.Txs {
-	//	// 获取交易结果
-	//	txResult, err := c.rpchttp.Tx(context.Background(), txHash.Hash(), false)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	// 累加 Gas 使用量
-	//	totalGas += uint64(txResult.TxResult.GasUsed)
-	//}
-
-	txDecoder := authtx.DefaultTxDecoder(c.codec)
-	for _, txBytes := range block.Txs {
-		// 解码交易
-		tx, err := txDecoder(txBytes)
+	for _, txData := range block.Block.Data.Txs {
+		// 创建解码交易请求
+		decodeTxReq := DecodeTxRequest{Tx: txData}
+		jsonReq, err := json.Marshal(decodeTxReq)
 		if err != nil {
-			return nil, err
+			log.Error("failed to marshal decode tx request: %v", err)
+			return nil, nil
 		}
-		// 获取交易中的消息
-		msgs := tx.GetMsgs()
-		for i, msg := range msgs {
-			log.Info("Message %d: %+v", i, msg)
-			// 获取消息的具体信息
-			switch msg := msg.(type) {
-			case *banktypes.MsgSend:
-				log.Info("Sender: %s", msg.FromAddress)
-				log.Info("Receiver: %s", msg.ToAddress)
-				log.Info("Amount: %s", msg.Amount)
 
-				blockTransaction := &account.BlockInfoTransactionList{
-					From:   msg.FromAddress,
-					To:     msg.ToAddress,
-					Hash:   string(txBytes.Hash()),
-					Amount: msg.Amount.String(),
-				}
-				blockTransactions = append(blockTransactions, blockTransaction)
-			// 其他消息类型的处理
-			default:
-				log.Info("Unknown message type: %T", msg)
+		// 发送 POST 请求到 tx/v1beta1/decode 端点
+		resp, err := http.Post(restURL+"/cosmos/tx/v1beta1/decode", "application/json", bytes.NewBuffer(jsonReq))
+		if err != nil {
+			log.Error("failed to send decode tx request: %v", err)
+			return nil, nil
+		}
+		// 读取响应
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Error("failed to read decode tx response: %v", err)
+			return nil, nil
+		}
+		resp.Body.Close()
+		var decodeTxResp DecodeTxResponse
+		err = json.Unmarshal(body, &decodeTxResp)
+		if err != nil {
+			log.Error("failed to unmarshal decode tx response: %v", err)
+			return nil, nil
+		}
+		for _, msg := range decodeTxResp.Tx.Body.Messages {
+			log.Info("Sender: %s", msg.FromAddress)
+			log.Info("Receiver: %s", msg.ToAddress)
+			log.Info("Amount: %s", msg.Amount.String())
+
+			blockTransaction := &account.BlockInfoTransactionList{
+				From:   msg.FromAddress,
+				To:     msg.ToAddress,
+				Hash:   decodeTxResp.Response.Txhash,
+				Amount: msg.Amount.String(),
 			}
+			blockTransactions = append(blockTransactions, blockTransaction)
 		}
 	}
 	return blockTransactions, nil

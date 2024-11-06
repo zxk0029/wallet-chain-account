@@ -36,18 +36,19 @@ func TestClient_GetBalance(t *testing.T) {
 	c, err := DialCosmosClient(context.Background(), defaultRpcAddress)
 	assert.NoError(t, err)
 
-	ret, err := c.GetBalance("uatom", "cosmos19thxsunl9lzywglsndth5a278wtavawzzpv44q")
+	balance, err := c.GetBalance("uatom", "cosmos19thxsunl9lzywglsndth5a278wtavawzzpv44q")
 	assert.NoError(t, err)
-	fmt.Println("here", ret)
+	fmt.Printf("amaount: %s, denom: %s \n", balance.Amount, balance.GetDenom())
 }
 
+// success
 func TestClient_GetTxByHash(t *testing.T) {
 	c, err := DialCosmosClient(context.Background(), defaultRpcAddress)
 	assert.NoError(t, err)
 
-	ret, err := c.GetTxByHash("85C84677F466D71C0BB6E744439C3040ABB35B8F2B838CC7B73CD1BFF33D0B88")
+	ret, err := c.GetTxByHash("https://cosmos-rest.publicnode.com/", "85C84677F466D71C0BB6E744439C3040ABB35B8F2B838CC7B73CD1BFF33D0B88")
 	assert.NoError(t, err)
-	fmt.Println("here", ret)
+	fmt.Printf("result: %s \n", ret.Response.Txhash)
 }
 
 func TestClient_GetBlock(t *testing.T) {
@@ -55,9 +56,9 @@ func TestClient_GetBlock(t *testing.T) {
 	assert.NoError(t, err)
 
 	height := int64(22879895)
-	ret, err := c.GetBlock(&height)
+	block, err := c.GetBlock("https://cosmos-rest.publicnode.com/", height)
 	assert.NoError(t, err)
-	fmt.Println("here", ret)
+	fmt.Printf("hash: %s \n", block.BlockId.Hash)
 }
 
 func TestClient_GetTxByEvent(t *testing.T) {
@@ -67,5 +68,14 @@ func TestClient_GetTxByEvent(t *testing.T) {
 	event := []string{"send"}
 	ret, err := c.GetTxByEvent(event, 0, 10)
 	assert.NoError(t, err)
-	fmt.Println("here", ret)
+	fmt.Printf("result: %s \n", ret)
+}
+
+func TestClient_Tx(t *testing.T) {
+	c, err := DialCosmosClient(context.Background(), defaultRpcAddress)
+	assert.NoError(t, err)
+
+	ret, err := c.Tx([]byte("85C84677F466D71C0BB6E744439C3040ABB35B8F2B838CC7B73CD1BFF33D0B88"), false)
+	assert.NoError(t, err)
+	fmt.Printf("result: %s \n", ret.TxResult.Info)
 }
