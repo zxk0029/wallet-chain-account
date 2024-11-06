@@ -2,7 +2,6 @@ package chaindispatcher
 
 import (
 	"context"
-	"github.com/dapplink-labs/wallet-chain-account/chain/cosmos"
 	"runtime/debug"
 	"strings"
 
@@ -12,7 +11,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
+	"github.com/dapplink-labs/wallet-chain-account/chain/cosmos"
 	"github.com/dapplink-labs/wallet-chain-account/chain/ethereum"
+	"github.com/dapplink-labs/wallet-chain-account/chain/tron"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
@@ -37,11 +38,13 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 	chainAdaptorFactoryMap := map[string]func(conf *config.Config) (chain.IChainAdaptor, error){
 		ethereum.ChainName: ethereum.NewChainAdaptor,
 		cosmos.ChainName:   cosmos.NewChainAdaptor,
+		tron.ChainName:     tron.NewChainAdaptor,
 	}
 
 	supportedChains := []string{
 		ethereum.ChainName,
 		cosmos.ChainName,
+		tron.ChainName,
 	}
 
 	for _, c := range conf.Chains {
