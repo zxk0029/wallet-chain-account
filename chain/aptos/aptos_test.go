@@ -1070,8 +1070,8 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 
 	var (
 		fromAddress = from.Address.String()
-		//fromPubKey  = from.PubKey()
-		fromPrvKey = fromPrivateKey.ToHex()
+		fromPubKey  = from.PubKey()
+		fromPrvKey  = fromPrivateKey.ToHex()
 
 		toAddress = to.Address.String()
 
@@ -1166,13 +1166,16 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Println("BuildSignedTransaction SignedTx", buildSignedTransaction.SignedTx)
 
-	auth := &crypto.Ed25519Authenticator{}
+	// 3.1, Deserializer
 	signedTxBytesDes := bcs.NewDeserializer(signedTxBytes)
 	signedTx := &aptos.SignedTransaction{
-		Transaction: unSignTx,
+		Transaction: &aptos.RawTransaction{},
 		Authenticator: &aptos.TransactionAuthenticator{
 			Variant: aptos.TransactionAuthenticatorEd25519,
-			Auth:    auth,
+			Auth: &crypto.Ed25519Authenticator{
+				PubKey: &crypto.Ed25519PublicKey{},
+				Sig:    &crypto.Ed25519Signature{},
+			},
 		},
 	}
 	signedTx.UnmarshalBCS(signedTxBytesDes)
@@ -1197,17 +1200,37 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 	signedTx11111, _ := json.Marshal(signedTx)
 	fmt.Printf("signedTx11111: %s\n", signedTx11111)
 
-	// 4, submit tx
-	submitResult, err := aptosClient.SubmitTransaction(signedTx)
-	fmt.Printf("\n=== Transaction Submit Result ===\n")
-	if submitResult != nil {
-		fmt.Printf("Hash: %s\n", submitResult.Hash)
-		fmt.Printf("Sender: %s\n", submitResult.Sender)
-		fmt.Printf("Sequence Number: %d\n", submitResult.SequenceNumber)
-		fmt.Printf("Max Gas Amount: %d\n", submitResult.MaxGasAmount)
-		fmt.Printf("Gas Unit Price: %d\n", submitResult.GasUnitPrice)
-		fmt.Printf("Expiration Timestamp: %d\n", submitResult.ExpirationTimestampSecs)
+	signedTxSerializeBytes, err := bcs.Serialize(signedTx)
+	if err != nil {
+		t.Fatalf("Failed to marshal signed transaction: %v", err)
 	}
+	verifyTransactionRequest := &account.VerifyTransactionRequest{
+		Chain:     ChainName,
+		Network:   network,
+		PublicKey: fromPubKey.ToHex(),
+		Signature: base64.StdEncoding.EncodeToString(signedTxSerializeBytes),
+	}
+	verifyResp, err := adaptor.VerifySignedTransaction(verifyTransactionRequest)
+	if err != nil {
+		t.Fatalf("VerifySignedTransaction fail: %v", err)
+	}
+	fmt.Printf("verifyResp Verify: %v\n", verifyResp.Verify)
+	fmt.Printf("verifyResp Code: %v\n", verifyResp.Code)
+	fmt.Printf("verifyResp Msg: %v\n", verifyResp.Msg)
+
+	// 4, submit signedTx
+	submitResult, err := aptosClient.SubmitTransaction(signedTx)
+	if submitResult == nil {
+		fmt.Printf("submitResult: is null\n")
+		return
+	}
+	fmt.Printf("\n=== Transaction Submit Result ===\n")
+	fmt.Printf("Hash: %s\n", submitResult.Hash)
+	fmt.Printf("Sender: %s\n", submitResult.Sender)
+	fmt.Printf("Sequence Number: %d\n", submitResult.SequenceNumber)
+	fmt.Printf("Max Gas Amount: %d\n", submitResult.MaxGasAmount)
+	fmt.Printf("Gas Unit Price: %d\n", submitResult.GasUnitPrice)
+	fmt.Printf("Expiration Timestamp: %d\n", submitResult.ExpirationTimestampSecs)
 	assert.NoError(t, err, "SubmitTransaction fail")
 
 	// 5, wait tx
