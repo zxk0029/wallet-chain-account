@@ -14,13 +14,12 @@ type Server struct {
 }
 
 type RPC struct {
-	RPCURL  string `yaml:"rpc_url"`
-	RPCUser string `yaml:"rpc_user"`
-	RPCPass string `yaml:"rpc_pass"`
 }
 
 type Node struct {
-	RPCs         []*RPC `yaml:"rpcs"`
+	RpcUrl       string `yaml:"rpc_url"`
+	RpcUser      string `yaml:"rpc_user"`
+	RpcPass      string `yaml:"rpc_pass"`
 	DataApiUrl   string `yaml:"data_api_url"`
 	DataApiKey   string `yaml:"data_api_key"`
 	DataApiToken string `yaml:"data_api_token"`
