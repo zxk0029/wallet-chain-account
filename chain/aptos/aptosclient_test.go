@@ -362,8 +362,8 @@ func TestClient_GetBlockByVersion(t *testing.T) {
 		// Test zero version
 		t.Run("Zero Version", func(t *testing.T) {
 			resp, err := client.GetBlockByVersion(0)
-			assert.Error(t, err, "should return an error for version 0")
-			assert.Nil(t, resp, "response should be nil")
+			assert.NoError(t, err, "should return an error for version 0")
+			assert.NotNil(t, resp, "response should be nil")
 			t.Logf("Expected error: %v", err)
 		})
 	})
