@@ -1009,6 +1009,7 @@ func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
 	jsonBytes, err := json.Marshal(transferReq)
 	assert.NoError(t, err)
 	validBase64Tx := base64.StdEncoding.EncodeToString(jsonBytes)
+	fmt.Println("CreateUnSignTransaction validBase64Tx", validBase64Tx)
 
 	t.Run("normal tx", func(t *testing.T) {
 		req := &account.UnSignTransactionRequest{
@@ -1017,7 +1018,7 @@ func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
 			Network:       string(Mainnet),
 			Base64Tx:      validBase64Tx,
 		}
-
+		fmt.Println("CreateUnSignTransaction req", req)
 		resp, err := adaptor.CreateUnSignTransaction(req)
 		fmt.Println("CreateUnSignTransaction resp", resp)
 		assert.NoError(t, err)
