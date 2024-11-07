@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/mr-tron/base58"
 	"google.golang.org/protobuf/runtime/protoimpl"
+	"time"
 )
 
 const ChainName = "Solana"
@@ -32,7 +33,7 @@ type ChainAdaptor struct {
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	cli, err := NewSolanaClients(conf)
 
-	sol, err := NewSolScanClient(conf.WalletNode.Sol.SolScanBaseUrl, conf.WalletNode.Sol.SolScanApiKey, conf.WalletNode.Sol.SolScanBaseTimeout)
+	sol, err := NewSolScanClient(conf.WalletNode.Sol.RpcUrl, conf.WalletNode.Sol.DataApiKey, time.Second*10)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,7 @@ package chaindispatcher
 
 import (
 	"context"
-	"github.com/dapplink-labs/wallet-chain-account/chain/aptos"
+
 	"runtime/debug"
 	"strings"
 
@@ -13,8 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
+	"github.com/dapplink-labs/wallet-chain-account/chain/aptos"
+	"github.com/dapplink-labs/wallet-chain-account/chain/cosmos"
 	"github.com/dapplink-labs/wallet-chain-account/chain/ethereum"
 	"github.com/dapplink-labs/wallet-chain-account/chain/solana"
+	"github.com/dapplink-labs/wallet-chain-account/chain/sui"
 	"github.com/dapplink-labs/wallet-chain-account/chain/tron"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
@@ -39,15 +42,19 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 	}
 	chainAdaptorFactoryMap := map[string]func(conf *config.Config) (chain.IChainAdaptor, error){
 		ethereum.ChainName: ethereum.NewChainAdaptor,
+		cosmos.ChainName:   cosmos.NewChainAdaptor,
 		solana.ChainName:   solana.NewChainAdaptor,
 		tron.ChainName:     tron.NewChainAdaptor,
 		aptos.ChainName:    aptos.NewChainAdaptor,
+		sui.ChainName:      sui.NewSuiAdaptor,
 	}
 
 	supportedChains := []string{
 		ethereum.ChainName,
+		cosmos.ChainName,
 		solana.ChainName,
 		tron.ChainName,
+		sui.ChainName,
 		aptos.ChainName,
 	}
 

@@ -106,6 +106,6 @@ func (c SuiClient) GetTxDetailByDigest(digest string) (models.SuiTransactionBloc
 }
 
 func NewSuiClient(conf *config.Config) (*SuiClient, error) {
-	client := sui.NewSuiClient(conf.WalletNode.Sui.RPCs[0].RPCURL)
+	client := sui.NewSuiClient(conf.WalletNode.Sui.RpcUrl)
 	return &SuiClient{client: client}, nil
 }

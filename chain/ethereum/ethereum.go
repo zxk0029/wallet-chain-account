@@ -37,7 +37,7 @@ type ChainAdaptor struct {
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	ethClient, err := DialEthClient(context.Background(), conf.WalletNode.Eth.RPCs[0].RPCURL)
+	ethClient, err := DialEthClient(context.Background(), conf.WalletNode.Eth.RpcUrl)
 	if err != nil {
 		return nil, err
 	}
