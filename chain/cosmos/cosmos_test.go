@@ -3,11 +3,11 @@ package cosmos
 import (
 	"flag"
 	"fmt"
-	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 )

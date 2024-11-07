@@ -2,12 +2,13 @@ package cosmos
 
 import (
 	"context"
-	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
 	"fmt"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
