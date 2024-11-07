@@ -16,6 +16,8 @@ import (
 	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
 
+const ChainName = "Ton"
+
 type ChainAdaptor struct {
 	tonClient     *TonClient
 	tonDataClient *TonDataClient
@@ -75,19 +77,31 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 }
 
 func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
-	return nil, nil
+	return &account.BlockResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	return nil, nil
+	return &account.BlockResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	return nil, nil
+	return &account.BlockHeaderResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
-	return nil, nil
+	return &account.BlockHeaderResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
@@ -110,7 +124,7 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
-	ret, err := c.tonDataClient.GetEstimateFee(req.RawTx, req.Address)
+	ret, err := c.tonDataClient.GetEstimateFee(req.Address, req.RawTx)
 	if err != nil {
 		return &account.FeeResponse{
 			Code: common.ReturnCode_SUCCESS,
@@ -118,45 +132,11 @@ func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, er
 		}, err
 	}
 
-	var normalFee int64
-	ParseAndAdd := func(s string) error {
-		value, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return err
-		}
-		normalFee += value
-		return nil
-	}
-
-	if err1 := ParseAndAdd(ret.InFwdFee); err1 != nil {
-		return &account.FeeResponse{
-			Code: common.ReturnCode_SUCCESS,
-			Msg:  "get fee fail in fwd fee",
-		}, err1
-	}
-	if err1 := ParseAndAdd(ret.StorageFee); err1 != nil {
-		return &account.FeeResponse{
-			Code: common.ReturnCode_SUCCESS,
-			Msg:  "get fee fail in storage fee",
-		}, err1
-	}
-	if err2 := ParseAndAdd(ret.GasFee); err2 != nil {
-		return &account.FeeResponse{
-			Code: common.ReturnCode_SUCCESS,
-			Msg:  "get fee fail in gas fee",
-		}, err2
-	}
-	if err3 := ParseAndAdd(ret.FwdFee); err3 != nil {
-		return &account.FeeResponse{
-			Code: common.ReturnCode_SUCCESS,
-			Msg:  "get fee fail in fwd fee",
-		}, err3
-	}
-
+	normalFee := ret.InFwdFee + ret.StorageFee + ret.GasFee + ret.FwdFee
 	return &account.FeeResponse{
 		Code:      common.ReturnCode_SUCCESS,
 		Msg:       "get fee success",
-		NormalFee: strconv.FormatInt(normalFee, 10),
+		NormalFee: strconv.FormatUint(normalFee, 10),
 	}, nil
 }
 
@@ -174,7 +154,7 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 }
 
 func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
-	ret, err := c.tonDataClient.GetTxByAddr(req.Address)
+	ret, err := c.tonDataClient.GetTxByAddr(req.Address, uint64(req.Page), uint64(req.Pagesize))
 	if err != nil {
 		return nil, err
 	}
@@ -220,23 +200,38 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 }
 
 func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
-	return nil, nil
+	return &account.BlockByRangeResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
-	return nil, nil
+	return &account.UnSignTransactionResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
-	return nil, nil
+	return &account.SignedTransactionResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
-	return nil, nil
+	return &account.DecodeTransactionResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
-	return nil, nil
+	return &account.VerifyTransactionResponse{
+		Code: common.ReturnCode_SUCCESS,
+		Msg:  "Do not support this rpc interface",
+	}, nil
 }
 
 func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {

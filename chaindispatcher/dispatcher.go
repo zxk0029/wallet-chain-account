@@ -12,10 +12,12 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
+	"github.com/dapplink-labs/wallet-chain-account/chain/aptos"
 	"github.com/dapplink-labs/wallet-chain-account/chain/cosmos"
 	"github.com/dapplink-labs/wallet-chain-account/chain/ethereum"
 	"github.com/dapplink-labs/wallet-chain-account/chain/solana"
 	"github.com/dapplink-labs/wallet-chain-account/chain/sui"
+	"github.com/dapplink-labs/wallet-chain-account/chain/ton"
 	"github.com/dapplink-labs/wallet-chain-account/chain/tron"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
@@ -39,11 +41,13 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		registry: make(map[ChainType]chain.IChainAdaptor),
 	}
 	chainAdaptorFactoryMap := map[string]func(conf *config.Config) (chain.IChainAdaptor, error){
+		aptos.ChainName:    aptos.NewChainAdaptor,
 		ethereum.ChainName: ethereum.NewChainAdaptor,
 		cosmos.ChainName:   cosmos.NewChainAdaptor,
 		solana.ChainName:   solana.NewChainAdaptor,
 		tron.ChainName:     tron.NewChainAdaptor,
 		sui.ChainName:      sui.NewSuiAdaptor,
+		ton.ChainName:      ton.NewChainAdaptor,
 	}
 
 	supportedChains := []string{
@@ -52,6 +56,8 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		solana.ChainName,
 		tron.ChainName,
 		sui.ChainName,
+		ton.ChainName,
+		aptos.ChainName,
 	}
 
 	for _, c := range conf.Chains {
