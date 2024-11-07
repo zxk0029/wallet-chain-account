@@ -111,7 +111,12 @@ func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accou
 
 // error
 func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	hashBlock, err := c.client.GetBlockByHash([]byte(req.Hash))
+	hexBytes, err := hex.DecodeString(req.GetHash())
+	if err != nil {
+		log.Error("get block header by hash decode hash error (%w)", err)
+		return nil, err
+	}
+	hashBlock, err := c.client.GetBlockByHash(hexBytes)
 	if err != nil {
 		log.Error("get block by hash error (%w)", err)
 		return nil, err
@@ -145,8 +150,7 @@ func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.B
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	hexStr := hex.EncodeToString([]byte(req.GetHash()))
-	hexBytes, err := hex.DecodeString(hexStr)
+	hexBytes, err := hex.DecodeString(req.GetHash())
 	if err != nil {
 		log.Error("get block header by hash decode hash error (%w)", err)
 		return nil, err
