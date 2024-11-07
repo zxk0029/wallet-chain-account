@@ -2,6 +2,7 @@ package cosmos
 
 import (
 	"context"
+	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -82,7 +83,6 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 }
 
 func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
-
 	block, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, req.Height)
 	if err != nil {
 		log.Error("get block by number error (%w)", err)
@@ -109,27 +109,49 @@ func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accou
 	}, nil
 }
 
+// error
 func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	block, err := c.client.GetBlockByHash([]byte(req.Hash))
+	hashBlock, err := c.client.GetBlockByHash([]byte(req.Hash))
 	if err != nil {
 		log.Error("get block by hash error (%w)", err)
 		return nil, err
 	}
+	block, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, hashBlock.Block.Height)
+	if err != nil {
+		log.Error("get block by number error (%w)", err)
+		return nil, err
+	}
 
-	blockResponse, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, block.Block.Header.Height)
-	log.Info("block tx : %s", blockResponse.Block.Data.Txs[0])
+	transactions, err := c.client.DecodeBlockTx(c.conf.WalletNode.Cosmos.RestUrl, block)
+	if err != nil {
+		log.Error("decode block tx error (%w)", err)
+		return nil, err
+	}
+
+	height, err := strconv.ParseInt(block.Block.Header.Height, 10, 64)
+	if err != nil {
+		log.Error("decode block tx parse height  error (%w)", err)
+		return nil, err
+	}
+
 	// BaseFee
 	return &account.BlockResponse{
 		Code:         common2.ReturnCode_SUCCESS,
 		Msg:          "get block by hash success",
-		Height:       block.Block.Height,
-		Hash:         string(block.Block.Hash()),
-		Transactions: nil,
+		Height:       height,
+		Hash:         block.BlockId.Hash,
+		Transactions: transactions,
 	}, nil
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	header, err := c.client.GetHeaderByHash([]byte(req.GetHash()))
+	hexStr := hex.EncodeToString([]byte(req.GetHash()))
+	hexBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		log.Error("get block header by hash decode hash error (%w)", err)
+		return nil, err
+	}
+	header, err := c.client.GetHeaderByHash(hexBytes)
 	if err != nil {
 		log.Error("get block header by hash error (%w)", err)
 		return nil, err
@@ -249,6 +271,8 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 	log.Info("tx hash: %s, amount: %s", req.GetHash(), amount)
 
 	return &account.TxHashResponse{
+		Code: common2.ReturnCode_SUCCESS,
+		Msg:  "get tx by hash success",
 		Tx: &account.TxMessage{
 			Hash:            req.Hash,
 			Index:           uint32(index),
@@ -265,6 +289,7 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 	}, nil
 }
 
+// fail
 func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
 	minHeight, err := strconv.ParseInt(req.GetStart(), 10, 64)
 	if err != nil {
