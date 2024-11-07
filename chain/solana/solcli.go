@@ -19,12 +19,6 @@ import (
 	"github.com/dapplink-labs/wallet-chain-account/config"
 )
 
-const (
-	defaultDialTimeout    = 5 * time.Second
-	defaultDialAttempts   = 5
-	defaultRequestTimeout = 10 * time.Second
-)
-
 type SolanaCli interface {
 	NewSolanaClients(conf *config.Config) (*SolanaClient, error)
 	GetLatestBlockHeight() (int64, error)
@@ -40,7 +34,7 @@ type SolanaCli interface {
 type SolanaClient struct {
 	RpcClient    rpc.RpcClient
 	Client       *client.Client
-	solanaConfig config.SolanaNode
+	solanaConfig config.Node
 }
 
 type TransactionList struct {
@@ -58,7 +52,7 @@ type RpcBlock struct {
 }
 
 func NewSolanaClients(conf *config.Config) (*SolanaClient, error) {
-	endpoint := conf.WalletNode.Sol.RPCs[0].RPCURL
+	endpoint := conf.WalletNode.Sol.RpcUrl
 	rpcClient := rpc.NewRpcClient(endpoint)
 	clientNew := client.NewClient(endpoint)
 	return &SolanaClient{

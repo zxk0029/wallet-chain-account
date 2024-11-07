@@ -30,7 +30,7 @@ type ChainAdaptor struct {
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	rpcUrl := conf.WalletNode.Aptos.RPCs[0].RPCURL
+	rpcUrl := conf.WalletNode.Aptos.RpcUrl
 	apiKey := conf.WalletNode.Aptos.DataApiKey
 
 	aptosHttpClient, err := NewAptosHttpClient(rpcUrl, apiKey)
