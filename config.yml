@@ -7,7 +7,7 @@ chains: [Ethereum, Solana, Tron, Sui, Ton]
 
 wallet_node:
   eth:
-    rpc_url: 'https://rpc.flashbots.net'
+    rpc_url: 'https://eth-holesky.g.alchemy.com/v2/BvSZ5ZfdIwB-5SDXMz8PfGcbICYQqwrl'
     rpc_user: ''
     rpc_pass: ''
     data_api_url: 'https://api.etherscan.io/api?'
