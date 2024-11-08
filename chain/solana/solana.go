@@ -3,44 +3,37 @@ package solana
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
+
+	"github.com/mr-tron/base58"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/gagliardetto/solana-go"
+
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/gagliardetto/solana-go"
-	"github.com/mr-tron/base58"
-	"google.golang.org/protobuf/runtime/protoimpl"
-	"time"
 )
 
 const ChainName = "Solana"
 
-type BlockHashRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ConsumerToken string `protobuf:"bytes,1,opt,name=consumer_token,json=consumerToken,proto3" json:"consumer_token,omitempty"`
-	Chain         string `protobuf:"bytes,2,opt,name=chain,proto3" json:"chain,omitempty"`
-	Hash          string `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
-	ViewTx        bool   `protobuf:"varint,4,opt,name=view_tx,json=viewTx,proto3" json:"view_tx,omitempty"`
-}
 type ChainAdaptor struct {
-	solCli  SolanaClient
+	solCli  SolClient
 	solData *SolData
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	cli, err := NewSolanaClients(conf)
-
+	cli, err := NewSolClient(conf)
+	if err != nil {
+		return nil, err
+	}
 	sol, err := NewSolScanClient(conf.WalletNode.Sol.DataApiUrl, conf.WalletNode.Sol.DataApiKey, time.Duration(conf.WalletNode.Sol.TimeOut))
 	if err != nil {
 		return nil, err
 	}
-
 	return &ChainAdaptor{
 		solCli:  *cli,
 		solData: sol,
@@ -54,9 +47,6 @@ func (c ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*acco
 		Msg:     "Support solana chain",
 		Support: true,
 	}, nil
-
-	////TODO implement me
-	//panic("implement me")
 }
 
 func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*account.ConvertAddressResponse, error) {
@@ -68,7 +58,7 @@ func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*accou
 			Address: common.Address{}.String(),
 		}, nil
 	}
-	publicKey := solana.PublicKeyFromBytes(publicKeyBytes)
+	address := solana.PublicKeyFromBytes(publicKeyBytes)
 	if err != nil {
 		return &account.ConvertAddressResponse{
 			Code:    common2.ReturnCode_ERROR,
@@ -77,7 +67,7 @@ func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*accou
 		}, nil
 	}
 
-	if !publicKey.IsOnCurve() {
+	if !address.IsOnCurve() {
 		return &account.ConvertAddressResponse{
 			Code:    common2.ReturnCode_ERROR,
 			Msg:     "public key is not on the curve",
@@ -88,12 +78,11 @@ func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*accou
 	return &account.ConvertAddressResponse{
 		Code:    common2.ReturnCode_SUCCESS,
 		Msg:     "convert address success",
-		Address: publicKey.String(),
+		Address: address.String(),
 	}, nil
 }
 
 func (c ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
-	// check Address
 	if len(req.Address) == 0 {
 		return &account.ValidAddressResponse{
 			Code:  common2.ReturnCode_SUCCESS,

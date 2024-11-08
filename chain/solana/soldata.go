@@ -11,12 +11,6 @@ import (
 	"github.com/dapplink-labs/chain-explorer-api/explorer/solscan"
 )
 
-var (
-	OklinkBaseUrl = "https://www.oklink.com/"
-	OklinkApiKey  = "5181d535-b68f-41cf-bbc6-25905e46b6a6"
-	OkTimeout     = time.Second * 20
-)
-
 type SolData struct {
 	SolDataCli *solscan.ChainExplorerAdaptor
 }
