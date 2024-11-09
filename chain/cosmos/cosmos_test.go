@@ -26,7 +26,6 @@ func getChainAdaptor() (chain.IChainAdaptor, error) {
 func TestCosmos_GetBlockByNumber(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
-
 	request := &account.BlockNumberRequest{
 		Height: int64(22879895),
 	}
@@ -62,7 +61,6 @@ func TestCosmos_GetBlockHeaderByHash(t *testing.T) {
 func TestCosmos_GetTxByHash(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
-
 	request := &account.TxHashRequest{
 		Hash: "85C84677F466D71C0BB6E744439C3040ABB35B8F2B838CC7B73CD1BFF33D0B88", //"35290F91317064307B5B1A9A44EEFB1CF3F66F68EAAD4539BCD6A5BA13866E90",
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
+	cttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -21,8 +23,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	sdktx "github.com/cosmos/cosmos-sdk/types/tx"
+	autx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/dapplink-labs/chain-explorer-api/explorer/oklink"
+	"github.com/dapplink-labs/wallet-chain-account/common/helpers"
+	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -42,6 +48,7 @@ type CosmosClient struct {
 	rpchttp *rpchttp.HTTP
 	codec   *codec.ProtoCodec
 
+	dataClient      *oklink.ChainExplorerAdaptor
 	grpcConn        *grpc.ClientConn
 	bankClient      banktypes.QueryClient
 	txServiceClient sdktx.ServiceClient
@@ -108,35 +115,40 @@ type TxEventAttribute struct {
 	Value string `json:"value"`
 }
 
-func DialCosmosClient(ctx context.Context, nodeUrl string) (*CosmosClient, error) {
+func DialCosmosClient(ctx context.Context, conf *config.Config) (*CosmosClient, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultDialTimeout)
 	defer cancel()
 
+	nodeUrl := conf.WalletNode.Cosmos.RpcUrl
+	dataApiKey := conf.WalletNode.Cosmos.DataApiKey
+	dataApiUrl := conf.WalletNode.Cosmos.DataApiUrl
+	timeOut := conf.WalletNode.Cosmos.TimeOut
 	bOff := retry.Exponential()
 	connClient, err := retry.Do(ctx, defaultDialAttempts, bOff, func() (*CosmosClient, error) {
-		//grpcConn, err := grpc.Dial(nodeUrl, grpc.WithInsecure())
-		//if err != nil {
-		//	log.Error("failed to retry dial nodeUrl (%s): %w", nodeUrl, err)
-		//	return nil, err
-		//}
-		//return grpcConn, nil
+		if !helpers.IsURLAvailable(nodeUrl) {
+			return nil, fmt.Errorf("address unavailable (%s)", nodeUrl)
+		}
 
-		//if !IsURLAvailable(rpcUrl) {
-		//	return nil, fmt.Errorf("address unavailable (%s)", rpcUrl)
-		//}
-		//
 		ctx := client.Context{}
 		conn, err := client.NewClientFromNode(nodeUrl)
 		if err != nil {
 			log.Error("failed to retry dial nodeUrl (%s): %w", nodeUrl, err)
 			return nil, err
 		}
+
+		dataClient, err := oklink.NewChainExplorerAdaptor(dataApiKey, dataApiUrl+"/", false, time.Duration(timeOut))
+		if err != nil {
+			log.Error("failed cosmos  new chain explorer adaptor", "err", err)
+			return nil, err
+		}
 		codec := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 		ctx = ctx.WithClient(conn).WithKeyring(keyring.NewInMemory(codec))
 		return &CosmosClient{
-			context:         ctx,
-			rpchttp:         conn,
-			codec:           codec,
+			context: ctx,
+			rpchttp: conn,
+			codec:   codec,
+
+			dataClient:      dataClient,
 			bankClient:      banktypes.NewQueryClient(ctx),
 			txServiceClient: sdktx.NewServiceClient(ctx),
 			authClient:      authv1beta1.NewQueryClient(ctx),
@@ -171,37 +183,17 @@ func (c *CosmosClient) GetBalance(coin, addr string) (*sdk.Coin, error) {
 	return resp.GetBalance(), nil
 }
 
-func (c *CosmosClient) GetTxByHash(restURL, hash string) (*TxResponse, error) {
-	//ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
-	//defer cancel()
+func (c *CosmosClient) GetTxByHash(hash string) (*ctypes.ResultTx, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	defer cancel()
 
-	//response, err := c.txServiceClient.GetTx(ctx, &sdktx.GetTxRequest{Hash: hash})
-	//if err != nil {
-	//	log.Error("failed to get block: %v", err)
-	//	return nil, err
-	//}
-
-	resp, err := http.Get(fmt.Sprintf("%s/cosmos/tx/v1beta1/txs/%s", restURL, hash))
+	hashBytes, err := hex.DecodeString(hash)
 	if err != nil {
-		log.Error("failed to get block: %v", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Error("failed to read response body: %v", err)
+		log.Error("failed to get block by hash: %v", err)
 		return nil, err
 	}
 
-	var txResponse TxResponse
-	err = json.Unmarshal(body, &txResponse)
-	if err != nil {
-		log.Error("failed to unmarshal response: %v", err)
-		return nil, err
-	}
-
-	return &txResponse, nil
+	return c.rpchttp.Tx(ctx, hashBytes, true)
 }
 
 func (c *CosmosClient) GetTxByEvent(event []string, page, limit uint64) (*sdktx.GetTxsEventResponse, error) {
@@ -296,54 +288,80 @@ func (c *CosmosClient) BroadcastTx(txByte []byte) (*sdktx.BroadcastTxResponse, e
 	})
 }
 
-// https://cosmos-rest.publicnode.com/cosmos/tx/v1beta1/txs/block/22879895
-func (c *CosmosClient) GetBlock(restURL string, height int64) (*BlockResponse, error) {
-	//ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
-	//defer cancel()
-	//
-	//txsRequest := &sdktx.GetBlockWithTxsRequest{
-	//	Height: height,
-	//}
-	//result, err := c.txServiceClient.GetBlockWithTxs(ctx, txsRequest)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//decodedHash, err := base64.StdEncoding.DecodeString(string(result.Block.Data.Txs[0]))
-	//if err != nil {
-	//	log.Error("解码失败: %v", err)
-	//}
-	//fmt.Printf("解码前的二进制数据: %x\n", string(result.Block.Data.Txs[0]))
-	//fmt.Printf("解码后的二进制数据: %x\n", string(decodedHash))
-	//
-	//return nil, nil
+func (c *CosmosClient) GetBlock(height int64) (*ctypes.ResultBlock, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	defer cancel()
 
-	resp, err := http.Get(fmt.Sprintf("%s/cosmos/tx/v1beta1/txs/block/%d", restURL, height))
-	if err != nil {
-		log.Error("failed to get block: %v", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
+	return c.rpchttp.Block(ctx, &height)
+}
 
-	body, err := ioutil.ReadAll(resp.Body)
+func (c *CosmosClient) ParseTx(txData cttypes.Tx) {
+
+	// 创建一个 authTx.TxDecoder
+	txDecoder := autx.DefaultTxDecoder(c.codec)
+
+	txStr := "CpQBCpEBChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnEKLWNvc21vczFya2V3ZXhod3dubWFnNXgzczZscnpxMjRzdWc0andmMDc5dWEyeRItY29zbW9zMWE5NjU3NmE3dHh4cWozOTJwNDAzZGcyZXRycHMwam14aGpmNWp3GhEKBXVhdG9tEggxNjcyMzM4OBJlCk4KRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiECC6cnNR8l9z9mQsK/7jKyYHb6sXY4Kv37HZD91Ujoq+MSBAoCCH8SEwoNCgV1YXRvbRIEMzUzNRDJ0AgaQIMMnx49o57CM6l5vd/b/32ciczK0CuTuTv2qFA6DOvNMMI13sT2IqnIA8YVAMUXVOEEb/UmeluqFm7njlzYSIQ="
+	txStr = txData.String()
+	tx0, err := txDecoder([]byte(txStr))
+	fmt.Printf("Tx0 Type: %T\n", tx0)
+
+	decodeBytes1, _ := base64.StdEncoding.DecodeString(string(txStr))
+	tx1, err := txDecoder(decodeBytes1)
+	fmt.Printf("Tx1 Type: %T\n", tx1)
+
+	decodeBytes2, _ := hex.DecodeString(string(txStr))
+	tx2, err := txDecoder(decodeBytes2)
+	fmt.Printf("Tx2 Type: %T\n", tx2)
+
+	// 解码交易数据
+	tx, err := txDecoder([]byte(txStr))
 	if err != nil {
-		log.Error("failed to read response body: %v", err)
-		return nil, err
+		log.Error("decoder tx fail!", err)
+		return
 	}
 
-	var blockResp BlockResponse
-	err = json.Unmarshal(body, &blockResp)
+	// 打印交易信息
+	//fmt.Printf("Tx Hash: %X\n", txBytes.
+	fmt.Printf("Tx Type: %T\n", tx)
+
+	// 解析交易中的各个字段
+	for _, msg := range tx.GetMsgs() {
+		fmt.Printf("Msg Type: %T\n", msg)
+
+		switch msg := msg.(type) {
+		case *banktypes.MsgSend:
+			fmt.Printf("From: %s\n", msg.FromAddress)
+			fmt.Printf("To: %s\n", msg.ToAddress)
+			fmt.Printf("Amount: %s\n", msg.Amount)
+		default:
+			fmt.Println("Unknown Msg Type")
+		}
+	}
+}
+
+func (c *CosmosClient) GetBlockByHash(hash string) (*ctypes.ResultBlock, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	defer cancel()
+
+	hashBytes, err := hex.DecodeString(hash)
 	if err != nil {
-		log.Error("failed to unmarshal response: %v", err)
 		return nil, err
 	}
-	decodedHash, err := base64.StdEncoding.DecodeString(blockResp.BlockId.Hash)
+	result, err := c.rpchttp.BlockByHash(ctx, hashBytes)
 	if err != nil {
-		log.Error("解码失败: %v", err)
+		return nil, err
 	}
-	fmt.Printf("解码前的二进制数据: %x\n", blockResp.BlockId.Hash)
-	fmt.Printf("解码后的二进制数据: %x\n", string(decodedHash))
-	blockResp.BlockId.Hash = fmt.Sprintf("%x", string(decodedHash))
-	return &blockResp, nil
+	return result, nil
+}
+
+func (c *CosmosClient) TxDecode(txData []byte) (*sdktx.TxDecodeResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	defer cancel()
+
+	request := &sdktx.TxDecodeRequest{
+		TxBytes: txData,
+	}
+	return c.txServiceClient.TxDecode(ctx, request)
 }
 
 func (c *CosmosClient) DecodeBlockTx(restURL string, block *BlockResponse) ([]*account.BlockInfoTransactionList, error) {
@@ -394,37 +412,22 @@ func (c *CosmosClient) DecodeBlockTx(restURL string, block *BlockResponse) ([]*a
 	return blockTransactions, nil
 }
 
-func (c *CosmosClient) GetHeaderByHeight(height *int64) (*ctypes.ResultHeader, error) {
+func (c *CosmosClient) GetHeaderByHeight(height int64) (*ctypes.ResultHeader, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
 	defer cancel()
 
-	result, err := c.rpchttp.Header(ctx, height)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return c.rpchttp.Header(ctx, &height)
 }
 
-func (c *CosmosClient) GetHeaderByHash(hash []byte) (*ctypes.ResultHeader, error) {
+func (c *CosmosClient) GetHeaderByHash(hash string) (*ctypes.ResultHeader, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
 	defer cancel()
 
-	result, err := c.rpchttp.HeaderByHash(ctx, hash)
+	hashBytes, err := hex.DecodeString(hash)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
-}
-
-func (c *CosmosClient) GetBlockByHash(hash []byte) (*ctypes.ResultBlock, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
-	defer cancel()
-
-	result, err := c.rpchttp.BlockByHash(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return c.rpchttp.HeaderByHash(ctx, hashBytes)
 }
 
 func (c *CosmosClient) BlockchainInfo(minHeight, maxHeight int64) (*ctypes.ResultBlockchainInfo, error) {
@@ -438,11 +441,16 @@ func (c *CosmosClient) BlockchainInfo(minHeight, maxHeight int64) (*ctypes.Resul
 	return result, nil
 }
 
-func (c *CosmosClient) Tx(hash []byte, prove bool) (*ctypes.ResultTx, error) {
+func (c *CosmosClient) Tx(hash string, prove bool) (*ctypes.ResultTx, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
 	defer cancel()
 
-	result, err := c.rpchttp.Tx(ctx, hash, prove)
+	hashBytes, err := hex.DecodeString(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := c.rpchttp.Tx(ctx, hashBytes, prove)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +458,6 @@ func (c *CosmosClient) Tx(hash []byte, prove bool) (*ctypes.ResultTx, error) {
 }
 
 func (c *CosmosClient) Close() error {
-	//c.rpcHttp.OnStop()
-	//return c.grpcConn.Close()
+	c.rpchttp.OnStop()
 	return nil
 }

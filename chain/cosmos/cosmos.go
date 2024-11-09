@@ -2,23 +2,24 @@ package cosmos
 
 import (
 	"context"
-	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 
 	authv1beta1 "cosmossdk.io/api/cosmos/auth/v1beta1"
 	types2 "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/golang/protobuf/ptypes"
-
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/golang/protobuf/ptypes"
 )
 
-const NetWork = "mainnet"
-const ChainName = "Cosmos"
+const (
+	NetWork   = "mainnet"
+	ChainName = "Cosmos"
+)
 
 type ChainAdaptor struct {
 	client CosmosClient
@@ -26,7 +27,7 @@ type ChainAdaptor struct {
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	cosmosClient, err := DialCosmosClient(context.Background(), conf.WalletNode.Cosmos.RPCs[0].RPCURL)
+	cosmosClient, err := DialCosmosClient(context.Background(), conf)
 	if err != nil {
 		log.Error("new chain adaptor error (%w)", err)
 		return nil, err
@@ -83,79 +84,134 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 }
 
 func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
-	block, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, req.Height)
+	block, err := c.client.GetBlock(req.Height)
 	if err != nil {
 		log.Error("get block by number error (%w)", err)
 		return nil, err
 	}
 
-	transactions, err := c.client.DecodeBlockTx(c.conf.WalletNode.Cosmos.RestUrl, block)
-	if err != nil {
-		log.Error("decode block tx error (%w)", err)
-		return nil, err
+	for _, txData := range block.Block.Txs {
+		// hash ok
+		txHash := fmt.Sprintf("%x", string(txData.Hash()))
+		fmt.Printf("tx0=%s ,tx hash:%s \n", txData.String(), fmt.Sprintf("%x", string(txData.Hash())))
+		result, _ := c.client.Tx(txHash, true)
+		for _, event := range result.TxResult.Events {
+			if event.Type == "transfer" {
+				fmt.Printf("event type: %s, \n", event.Type)
+				for _, attr := range event.GetAttributes() {
+					fmt.Printf("attribute key: %s, value: %s , index: %v \n", attr.GetKey(), attr.GetValue(), attr.GetIndex())
+				}
+			}
+		}
+
+		c.client.ParseTx(txData)
+		//fmt.Printf("tx1=%s \n", []byte(txData))
+		//fmt.Printf("tx2=%x \n", txData)
+		//
+		//decodeBytes, _ := base64.StdEncoding.DecodeString(string(txData))
+		//fmt.Printf("decodeBytes=%s \n", string(decodeBytes))
+		//encodeStr := base64.StdEncoding.EncodeToString(txData)
+		//fmt.Printf("encodeStr=%s \n", encodeStr)
+		//
+		//if err != nil {
+		//	log.Error("failed to decode base64 transaction: %v", err)
+		//}
+		//response, err := c.client.TxDecode(txData)
+		//if err != nil {
+		//	log.Error("get block by number error (%w)", err)
+		//	continue
+		//}
+		//
+		//log.Info("response=%s", response.GetTx().String())
+		//decodeBytes1, _ := base64.StdEncoding.DecodeString(response.GetTx().String())
+		//fmt.Printf("decodeBytes1=%s \n", string(decodeBytes1))
+		//encodeStr1 := base64.StdEncoding.EncodeToString([]byte(response.GetTx().String()))
+		//fmt.Printf("encodeStr1=%s \n", encodeStr1)
 	}
-	blockHeight, err := strconv.ParseInt(block.Block.Header.Height, 10, 64)
-	if err != nil {
-		log.Error("parse block height error (%w)", err)
-		return nil, err
-	}
-	// BaseFee
-	return &account.BlockResponse{
-		Code:         common2.ReturnCode_SUCCESS,
-		Msg:          "get block by number success",
-		Height:       blockHeight,
-		Hash:         block.BlockId.Hash,
-		Transactions: transactions,
-	}, nil
+
+	return nil, nil
+	//
+	//transactions, err := c.client.DecodeBlockTx(c.conf.WalletNode.Cosmos.DataApiUrl, block)
+	//
+	//if err != nil {
+	//	log.Error("decode block tx error (%w)", err)
+	//	return nil, err
+	//}
+	//blockHeight, err := strconv.ParseInt(block.Block.Header.Height, 10, 64)
+	//if err != nil {
+	//	log.Error("parse block height error (%w)", err)
+	//	return nil, err
+	//}
+	//// BaseFee
+	//return &account.BlockResponse{
+	//	Code:         common2.ReturnCode_SUCCESS,
+	//	Msg:          "get block by number success",
+	//	Height:       blockHeight,
+	//	Hash:         block.BlockId.Hash,
+	//	Transactions: transactions,
+	//}, nil
+	return nil, nil
 }
 
 // error
 func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	hexBytes, err := hex.DecodeString(req.GetHash())
-	if err != nil {
-		log.Error("get block header by hash decode hash error (%w)", err)
-		return nil, err
-	}
-	hashBlock, err := c.client.GetBlockByHash(hexBytes)
-	if err != nil {
-		log.Error("get block by hash error (%w)", err)
-		return nil, err
-	}
-	block, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, hashBlock.Block.Height)
-	if err != nil {
-		log.Error("get block by number error (%w)", err)
-		return nil, err
-	}
-
-	transactions, err := c.client.DecodeBlockTx(c.conf.WalletNode.Cosmos.RestUrl, block)
-	if err != nil {
-		log.Error("decode block tx error (%w)", err)
-		return nil, err
-	}
-
-	height, err := strconv.ParseInt(block.Block.Header.Height, 10, 64)
-	if err != nil {
-		log.Error("decode block tx parse height  error (%w)", err)
-		return nil, err
-	}
-
-	// BaseFee
-	return &account.BlockResponse{
-		Code:         common2.ReturnCode_SUCCESS,
-		Msg:          "get block by hash success",
-		Height:       height,
-		Hash:         block.BlockId.Hash,
-		Transactions: transactions,
-	}, nil
+	//	hexBytes, err := hex.DecodeString(req.GetHash())
+	//	if err != nil {
+	//		log.Error("get block header by hash decode hash error (%w)", err)
+	//		return nil, err
+	//	}
+	//	hashBlock, err := c.client.GetBlockByHash(hexBytes)
+	//=======
+	//func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
+	//	block, err := c.client.GetBlockByHash([]byte(req.Hash))
+	//>>>>>>> main
+	//	if err != nil {
+	//		log.Error("get block by hash error (%w)", err)
+	//		return nil, err
+	//	}
+	//<<<<<<< HEAD
+	//	block, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.RestUrl, hashBlock.Block.Height)
+	//	if err != nil {
+	//		log.Error("get block by number error (%w)", err)
+	//		return nil, err
+	//	}
+	//
+	//	transactions, err := c.client.DecodeBlockTx(c.conf.WalletNode.Cosmos.RestUrl, block)
+	//	if err != nil {
+	//		log.Error("decode block tx error (%w)", err)
+	//		return nil, err
+	//	}
+	//
+	//	height, err := strconv.ParseInt(block.Block.Header.Height, 10, 64)
+	//	if err != nil {
+	//		log.Error("decode block tx parse height  error (%w)", err)
+	//		return nil, err
+	//	}
+	//
+	//=======
+	//
+	//	blockResponse, err := c.client.GetBlock(c.conf.WalletNode.Cosmos.DataApiUrl, block.Block.Header.Height)
+	//	log.Info("block tx : %s", blockResponse.Block.Data.Txs[0])
+	//>>>>>>> main
+	//	// BaseFee
+	//	return &account.BlockResponse{
+	//		Code:         common2.ReturnCode_SUCCESS,
+	//		Msg:          "get block by hash success",
+	//<<<<<<< HEAD
+	//		Height:       height,
+	//		Hash:         block.BlockId.Hash,
+	//		Transactions: transactions,
+	//=======
+	//		Height:       block.Block.Height,
+	//		Hash:         string(block.Block.Hash()),
+	//		Transactions: nil,
+	//>>>>>>> main
+	//	}, nil
+	return nil, nil
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	hexBytes, err := hex.DecodeString(req.GetHash())
-	if err != nil {
-		log.Error("get block header by hash decode hash error (%w)", err)
-		return nil, err
-	}
-	header, err := c.client.GetHeaderByHash(hexBytes)
+	header, err := c.client.GetHeaderByHash(req.GetHash())
 	if err != nil {
 		log.Error("get block header by hash error (%w)", err)
 		return nil, err
@@ -176,7 +232,7 @@ func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest)
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
-	header, err := c.client.GetHeaderByHeight(&req.Height)
+	header, err := c.client.GetHeaderByHeight(req.Height)
 	if err != nil {
 		log.Error("get block header by number error (%w)", err)
 		return nil, err
@@ -244,53 +300,61 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 }
 
 func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashResponse, error) {
-	txResponse, err := c.client.GetTxByHash(c.conf.WalletNode.Cosmos.RestUrl, req.Hash)
-	if err != nil {
-		return &account.TxHashResponse{
-			Code: common2.ReturnCode_ERROR,
-			Msg:  "get tx by hash fail",
-		}, err
-	}
-
-	index := int64(0)
-	fromAddr, toAddr, amount := "", "", ""
-	for _, v := range txResponse.Response.Events {
-		if v.Type == "transfer" {
-			for _, attr := range v.Attributes {
-				if attr.Key == "recipient" {
-					toAddr = attr.Value
-				}
-				if attr.Key == "sender" {
-					fromAddr = attr.Value
-				}
-				if attr.Key == "amount" {
-					amount = attr.Value
-				}
-				if attr.Key == "msg_index" {
-					index, _ = strconv.ParseInt(attr.Value, 10, 32)
-				}
-			}
-		}
-	}
-	log.Info("tx hash: %s, amount: %s", req.GetHash(), amount)
-
-	return &account.TxHashResponse{
-		Code: common2.ReturnCode_SUCCESS,
-		Msg:  "get tx by hash success",
-		Tx: &account.TxMessage{
-			Hash:            req.Hash,
-			Index:           uint32(index),
-			Froms:           []*account.Address{{Address: fromAddr}},
-			Tos:             []*account.Address{{Address: toAddr}},
-			Values:          nil,
-			Fee:             txResponse.Response.GasUsed,
-			Status:          account.TxStatus_Success,
-			Type:            0,
-			Height:          txResponse.Response.Height,
-			ContractAddress: "",
-			Datetime:        txResponse.Response.Timestamp,
-		},
-	}, nil
+	//<<<<<<< HEAD
+	//	txResponse, err := c.client.GetTxByHash(c.conf.WalletNode.Cosmos.RestUrl, req.Hash)
+	//=======
+	//	txResponse, err := c.client.GetTxByHash(c.conf.WalletNode.Cosmos.DataApiUrl, req.Hash)
+	//>>>>>>> main
+	//	if err != nil {
+	//		return &account.TxHashResponse{
+	//			Code: common2.ReturnCode_ERROR,
+	//			Msg:  "get tx by hash fail",
+	//		}, err
+	//	}
+	//
+	//	index := int64(0)
+	//	fromAddr, toAddr, amount := "", "", ""
+	//	for _, v := range txResponse.Response.Events {
+	//		if v.Type == "transfer" {
+	//			for _, attr := range v.Attributes {
+	//				if attr.Key == "recipient" {
+	//					toAddr = attr.Value
+	//				}
+	//				if attr.Key == "sender" {
+	//					fromAddr = attr.Value
+	//				}
+	//				if attr.Key == "amount" {
+	//					amount = attr.Value
+	//				}
+	//				if attr.Key == "msg_index" {
+	//					index, _ = strconv.ParseInt(attr.Value, 10, 32)
+	//				}
+	//			}
+	//		}
+	//	}
+	//	log.Info("tx hash: %s, amount: %s", req.GetHash(), amount)
+	//
+	//	return &account.TxHashResponse{
+	//<<<<<<< HEAD
+	//		Code: common2.ReturnCode_SUCCESS,
+	//		Msg:  "get tx by hash success",
+	//=======
+	//>>>>>>> main
+	//		Tx: &account.TxMessage{
+	//			Hash:            req.Hash,
+	//			Index:           uint32(index),
+	//			Froms:           []*account.Address{{Address: fromAddr}},
+	//			Tos:             []*account.Address{{Address: toAddr}},
+	//			Values:          nil,
+	//			Fee:             txResponse.Response.GasUsed,
+	//			Status:          account.TxStatus_Success,
+	//			Type:            0,
+	//			Height:          txResponse.Response.Height,
+	//			ContractAddress: "",
+	//			Datetime:        txResponse.Response.Timestamp,
+	//		},
+	//	}, nil
+	return nil, nil
 }
 
 // fail
