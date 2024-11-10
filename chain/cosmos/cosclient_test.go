@@ -135,6 +135,18 @@ func TestClient_Tx(t *testing.T) {
 	fmt.Printf("result: %s \n", response.Tx.String())
 }
 
+// success
+func TestClient_GetTx(t *testing.T) {
+	config, _ := getWalletConfig()
+	c, err := DialCosmosClient(context.Background(), config)
+	assert.NoError(t, err)
+
+	response, err := c.GetTx("85C84677F466D71C0BB6E744439C3040ABB35B8F2B838CC7B73CD1BFF33D0B88")
+	assert.NoError(t, err)
+	fmt.Printf("response TxHash: %s \n", response.GetTxResponse().TxHash)
+	fmt.Printf("response: %s \n", response.GetTxResponse().String())
+}
+
 func TestClient_GetTxByEvent(t *testing.T) {
 	config, _ := getWalletConfig()
 	c, err := DialCosmosClient(context.Background(), config)

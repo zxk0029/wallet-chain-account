@@ -7,6 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	sdk256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/cosmos/cosmos-sdk/types/bech32"
+	"github.com/dapplink-labs/chain-explorer-api/common/chain"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -19,22 +22,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	ed255192 "github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	sdktx "github.com/cosmos/cosmos-sdk/types/tx"
 	autx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	commaccount "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/chain-explorer-api/explorer/oklink"
 	"github.com/dapplink-labs/wallet-chain-account/common/helpers"
+	"github.com/dapplink-labs/wallet-chain-account/common/retry"
 	"github.com/dapplink-labs/wallet-chain-account/config"
+	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
-
-	"github.com/dapplink-labs/wallet-chain-account/common/retry"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 )
 
 const (
@@ -49,7 +50,6 @@ type CosmosClient struct {
 	codec   *codec.ProtoCodec
 
 	dataClient      *oklink.ChainExplorerAdaptor
-	grpcConn        *grpc.ClientConn
 	bankClient      banktypes.QueryClient
 	txServiceClient sdktx.ServiceClient
 	authClient      authv1beta1.QueryClient
@@ -273,9 +273,11 @@ func (c *CosmosClient) SendTx(fromAddr, toAddr, coin string, amount int64) (*ban
 }
 
 func (c *CosmosClient) GetAddressFromPubKey(key []byte) string {
-	// todo check ed255192
-	pub := ed255192.PubKey{Key: key}
-	return pub.Address().String()
+	pubKey := &sdk256k1.PubKey{Key: key}
+	accAddress := sdk.AccAddress(pubKey.Address())
+	prefix := "cosmos"
+	address, _ := bech32.ConvertAndEncode(prefix, accAddress)
+	return address
 }
 
 func (c *CosmosClient) BroadcastTx(txByte []byte) (*sdktx.BroadcastTxResponse, error) {
@@ -295,7 +297,7 @@ func (c *CosmosClient) GetBlock(height int64) (*ctypes.ResultBlock, error) {
 	return c.rpchttp.Block(ctx, &height)
 }
 
-func (c *CosmosClient) ParseTx(txData cttypes.Tx) {
+func (c *CosmosClient) TxParse(txData cttypes.Tx) {
 
 	// 创建一个 authTx.TxDecoder
 	txDecoder := autx.DefaultTxDecoder(c.codec)
@@ -347,11 +349,7 @@ func (c *CosmosClient) GetBlockByHash(hash string) (*ctypes.ResultBlock, error) 
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.rpchttp.BlockByHash(ctx, hashBytes)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return c.rpchttp.BlockByHash(ctx, hashBytes)
 }
 
 func (c *CosmosClient) TxDecode(txData []byte) (*sdktx.TxDecodeResponse, error) {
@@ -450,11 +448,34 @@ func (c *CosmosClient) Tx(hash string, prove bool) (*ctypes.ResultTx, error) {
 		return nil, err
 	}
 
-	result, err := c.rpchttp.Tx(ctx, hashBytes, prove)
-	if err != nil {
-		return nil, err
+	return c.rpchttp.Tx(ctx, hashBytes, prove)
+}
+
+func (c *CosmosClient) GetTxByAddress(page, pagesize uint64, address string, action commaccount.ActionType) (*commaccount.TransactionResponse[commaccount.AccountTxResponse], error) {
+	request := &commaccount.AccountTxRequest{
+		ChainShortName:   ChainName,
+		ExplorerName:     oklink.ChainExplorerName,
+		Action:           action,
+		Address:          address,
+		StartBlockHeight: 0,
+		EndBlockHeight:   22990189,
+		PageRequest: chain.PageRequest{
+			Page:  page,
+			Limit: pagesize,
+		},
 	}
-	return result, nil
+	rep, err := c.dataClient.GetTxByAddress(request)
+	return rep, err
+}
+
+func (c *CosmosClient) GetTx(hash string) (*sdktx.GetTxResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	defer cancel()
+
+	req := &sdktx.GetTxRequest{
+		Hash: hash,
+	}
+	return c.txServiceClient.GetTx(ctx, req)
 }
 
 func (c *CosmosClient) Close() error {
