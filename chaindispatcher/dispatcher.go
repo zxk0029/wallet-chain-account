@@ -18,6 +18,7 @@ import (
 	"github.com/dapplink-labs/wallet-chain-account/chain/ethereum"
 	"github.com/dapplink-labs/wallet-chain-account/chain/solana"
 	"github.com/dapplink-labs/wallet-chain-account/chain/sui"
+	"github.com/dapplink-labs/wallet-chain-account/chain/ton"
 	"github.com/dapplink-labs/wallet-chain-account/chain/tron"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
@@ -47,6 +48,7 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		tron.ChainName:     tron.NewChainAdaptor,
 		aptos.ChainName:    aptos.NewChainAdaptor,
 		sui.ChainName:      sui.NewSuiAdaptor,
+		ton.ChainName:      ton.NewChainAdaptor,
 	}
 
 	supportedChains := []string{
@@ -55,6 +57,7 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		solana.ChainName,
 		tron.ChainName,
 		sui.ChainName,
+		ton.ChainName,
 		aptos.ChainName,
 	}
 

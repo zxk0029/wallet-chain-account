@@ -2,9 +2,11 @@ package ton
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
 
+	"github.com/ethereum/go-ethereum/log"
 	gresty "github.com/go-resty/resty/v2"
 )
 
@@ -20,12 +22,14 @@ func NewTonDataClient(url string) (*TonDataClient, error) {
 	}
 	client := gresty.New()
 	client.SetBaseURL(url)
+	client.SetDebug(true)
 	client.OnAfterResponse(func(c *gresty.Client, r *gresty.Response) error {
 		statusCode := r.StatusCode()
 		if statusCode >= 400 {
 			method := r.Request.Method
-			url := r.Request.URL
-			return fmt.Errorf("%d cannot %s %s: %w", statusCode, method, url, errBlockChainHTTPError)
+			baseUrl := r.Request.URL
+			body := r.Request.Body
+			return fmt.Errorf("%d cannot %s %s %s: %w", statusCode, method, baseUrl, body, errBlockChainHTTPError)
 		}
 		return nil
 	})
@@ -35,9 +39,10 @@ func NewTonDataClient(url string) (*TonDataClient, error) {
 }
 
 func (tdc *TonDataClient) GetTxByTxHash(txHash string) (*Tx, error) {
-	res, err := tdc.client.R().SetQueryParams(map[string]string{
-		"hash": txHash,
-	}).SetResult(&Tx{}).Get("/transactions")
+	res, err := tdc.client.R().
+		SetQueryParams(map[string]string{
+			"hash": txHash,
+		}).SetResult(&Tx{}).Get("/transactions")
 	if err != nil {
 		return nil, errors.New("get transaction by hash fail")
 	}
@@ -48,9 +53,12 @@ func (tdc *TonDataClient) GetTxByTxHash(txHash string) (*Tx, error) {
 	return spt, nil
 }
 
-func (tdc *TonDataClient) GetTxByAddr(address string) (*Tx, error) {
+func (tdc *TonDataClient) GetTxByAddr(address string, page uint64, pageSize uint64) (*Tx, error) {
 	res, err := tdc.client.R().SetQueryParams(map[string]string{
 		"account": address,
+		"offset":  strconv.FormatUint(page, 10),
+		"limit":   strconv.FormatUint(pageSize, 10),
+		"sort":    "desc",
 	}).SetResult(&Tx{}).Get("/transactions")
 	if err != nil {
 		return nil, errors.New("get transaction by address fail")
@@ -63,9 +71,12 @@ func (tdc *TonDataClient) GetTxByAddr(address string) (*Tx, error) {
 }
 
 func (tdc *TonDataClient) PostSendTx(boc string) (string, error) {
-	res, err := tdc.client.R().SetBody(map[string]string{
-		"boc": boc,
-	}).SetResult(&SendTxResult{}).Post("/message")
+	res, err := tdc.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]string{
+			"boc": boc,
+		}).
+		SetResult(&SendTxResult{}).Post("/message")
 	if err != nil {
 		return "0x00", errors.New("send transaction fail")
 	}
@@ -77,16 +88,21 @@ func (tdc *TonDataClient) PostSendTx(boc string) (string, error) {
 }
 
 func (tdc *TonDataClient) GetEstimateFee(address string, boc string) (*EstimateFeeResult, error) {
-	res, err := tdc.client.R().SetBody(map[string]string{
-		"address": address,
-		"body":    boc,
-	}).SetResult(&SendTxResult{}).Post("/estimateFee")
+	res, err := tdc.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(&EstimateFeeRequest{
+			Address:      address,
+			Body:         boc,
+			IgnoreChksig: true,
+		}).
+		SetResult(&SourceFeesResult{}).Post("/estimateFee")
 	if err != nil {
-		return nil, errors.New("get transaction fee fail")
+		log.Error("get transaction fee fail", "err", err)
+		return nil, err
 	}
-	spt, ok := res.Result().(*EstimateFeeResult)
+	spt, ok := res.Result().(*SourceFeesResult)
 	if !ok {
-		return nil, errors.New("get transaction fee fail")
+		return nil, errors.New("get transaction fee fail, ok is false")
 	}
-	return spt, nil
+	return spt.SourceFees, nil
 }
