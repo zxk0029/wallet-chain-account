@@ -2,8 +2,6 @@ module github.com/dapplink-labs/wallet-chain-account
 
 go 1.22.7
 
-toolchain go1.22.8
-
 require (
 	cosmossdk.io/api v0.7.5
 	github.com/aptos-labs/aptos-go-sdk v1.0.0

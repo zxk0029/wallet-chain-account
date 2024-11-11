@@ -12,12 +12,40 @@ type EstimateGasPriceResponse struct {
 }
 
 type TransferRequest struct {
-	FromAddress string
-	PublicKey   string
-	ToAddress   string
-	Amount      uint64
+	FromAddress   string
+	FromPublicKey string
+	ToAddress     string
+	Amount        uint64
 	// TODO Need to support more currencies
 	// CoinType    string
+}
+
+type TransactionRequest struct {
+	Sender         string         `json:"Sender"`
+	SequenceNumber uint64         `json:"SequenceNumber"`
+	Payload        PayloadWrapper `json:"Payload"`
+
+	MaxGasAmount               uint64 `json:"MaxGasAmount"`
+	GasUnitPrice               uint64 `json:"GasUnitPrice"`
+	ExpirationTimestampSeconds uint64 `json:"ExpirationTimestampSeconds"`
+
+	ChainId uint8 `json:"ChainId"`
+}
+
+type PayloadWrapper struct {
+	Payload PayloadFunction `json:"Payload"`
+}
+
+type PayloadFunction struct {
+	Module   ModuleInfo `json:"Module"`
+	Function string     `json:"Function"`
+	ArgTypes []string   `json:"ArgTypes"`
+	Args     []string   `json:"Args"`
+}
+
+type ModuleInfo struct {
+	Address string `json:"Address"`
+	Name    string `json:"Name"`
 }
 
 type TransactionResponse struct {
