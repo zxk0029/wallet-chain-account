@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/aptos-labs/aptos-go-sdk/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"strconv"
-	"strings"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"

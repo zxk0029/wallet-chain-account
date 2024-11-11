@@ -153,7 +153,7 @@ require (
 	github.com/zondax/hid v0.9.2 // indirect
 	github.com/zondax/ledger-go v0.14.3 // indirect
 	go.etcd.io/bbolt v1.4.0-alpha.0.0.20240404170359-43604f3112c5 // indirect
-	go.mongodb.org/mongo-driver v1.11.0 // indirect
+	go.mongodb.org/mongo-driver v1.17.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect

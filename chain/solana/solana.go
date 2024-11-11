@@ -42,11 +42,22 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 }
 
 func (c ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*account.SupportChainsResponse, error) {
-	return &account.SupportChainsResponse{
-		Code:    common2.ReturnCode_SUCCESS,
-		Msg:     "Support solana chain",
-		Support: true,
-	}, nil
+	response := &account.SupportChainsResponse{
+		Code:    common2.ReturnCode_ERROR,
+		Msg:     "",
+		Support: false,
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		err := fmt.Errorf("GetSupportChains validateChainAndNetwork fail, err msg = %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return response, err
+	}
+
+	response.Msg = "Support this chain"
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Support = true
+	return response, nil
 }
 
 func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*account.ConvertAddressResponse, error) {
@@ -280,4 +291,14 @@ func (c ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequ
 func (c ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func validateChainAndNetwork(chain, network string) (bool, string) {
+	if chain != ChainName {
+		return false, "invalid chain"
+	}
+	//if network != NetworkMainnet && network != NetworkTestnet {
+	//	return false, "invalid network"
+	//}
+	return true, ""
 }
