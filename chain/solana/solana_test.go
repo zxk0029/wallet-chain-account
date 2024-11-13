@@ -1,100 +1,87 @@
 package solana
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/dapplink-labs/wallet-chain-account/chain"
-	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
+	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
 
-func setup() (chain.IChainAdaptor, error) {
-	conf, err := config.New("../../config.yml")
-	if err != nil {
-		log.Error("load config failed, error:", err)
-		return nil, err
+func Test_GetSupportChains(t *testing.T) {
+	adaptor := ChainAdaptor{}
+
+	req := &account.SupportChainsRequest{
+		Chain:   ChainName,
+		Network: "mainnet",
 	}
-	adaptor, err := NewChainAdaptor(conf)
+
+	resp, err := adaptor.GetSupportChains(req)
+
 	if err != nil {
-		log.Error("create chain adaptor failed, error:", err)
-		return nil, err
+		t.Errorf("GetSupportChains failed with error: %v", err)
 	}
-	return adaptor, nil
+	fmt.Printf("resp: %s\n", resp)
+
+	if resp.Code != common2.ReturnCode_SUCCESS {
+		t.Errorf("Expected success code, got %v", resp.Code)
+	}
+
+	if !resp.Support {
+		t.Error("Expected Support to be true")
+	}
 }
 
-// tx, err := solana.NewTransaction(
-// []solana.Instruction{
-// system.NewTransferInstruction(
-// value,
-// fromPubkey,
-// toPubkey,
-// ).Build(),
-// },
-// solana.HashFromBytes(binary.BigEndian.AppendUint64(make([]byte, 24), data.Nonce)),
-// solana.TransactionPayer(fromPubkey),
-func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
-	adaptor, err := setup()
-	if err != nil {
-		return
-	}
+func TestChainAdaptor_ConvertAddress(t *testing.T) {
+	const (
+		validPublicKey        = "7e376c64c64e88054b7a2d25dc716f45551d2f796ddc9e7be405e49c522b887c"
+		validPublicKeyAddress = "9VhPRjzizPY95TyBrve7heeJTZnofgkQYJpLxRSZGZ3H"
+		invalidPublicKey      = "invalid_hex"
+	)
 
-	resp, err := adaptor.CreateUnSignTransaction(&account.UnSignTransactionRequest{
-		Chain:    ChainName,
-		Network:  "mainnet",
-		Base64Tx: createTestBase64Tx(),
+	adaptor := &ChainAdaptor{}
+
+	t.Run("Valid Public Key", func(t *testing.T) {
+		req := &account.ConvertAddressRequest{
+			Chain:     ChainName,
+			Network:   "mainnet",
+			PublicKey: validPublicKey,
+		}
+		resp, err := adaptor.ConvertAddress(req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
+		assert.Equal(t, validPublicKeyAddress, resp.Address)
+		assert.Equal(t, "convert address success", resp.Msg)
+
+		t.Logf("Response Code: %v", resp.Code)
+		t.Logf("Response Message: %s", resp.Msg)
+		t.Logf("Converted Address: %s", resp.Address)
 	})
-	if err != nil {
-		log.Error("CreateUnSignTransaction failed:", err)
-		return
-	}
 
-	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
-	fmt.Println(resp.UnSignTx)
-}
-func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
-	adaptor, err := setup()
-	if err != nil {
-		return
-	}
+	t.Run("Empty Public Key", func(t *testing.T) {
+		req := &account.ConvertAddressRequest{
+			Chain:     ChainName,
+			Network:   "mainnet",
+			PublicKey: "",
+		}
+		resp, err := adaptor.ConvertAddress(req)
 
-	resp, err := adaptor.BuildSignedTransaction(&account.SignedTransactionRequest{
-		Chain:    ChainName,
-		Network:  "mainnet",
-		Base64Tx: createTestBase64Tx(),
+		assert.Error(t, err)
+		assert.Nil(t, resp)
 	})
-	if err != nil {
-		log.Error("CreateUnSignTransaction failed:", err)
-		return
-	}
 
-	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
-	fmt.Println(resp.SignedTx)
-}
-func createTestBase64Tx() string {
-	// 创建测试数据结构
-	testTx := TxStructure{
-		Nonce:           "hsuXVct3kUjH1uxj1Wi8z93TkLTJo7YrHV5hzV61gYe",
-		FromAddress:     "4wHd9tf4x4FkQ3JtgsMKyiEofEHSaZH5rYzfFKLvtESD",
-		ToAddress:       "AaWEWZJZq2M4AUytd9XQGUTUXSpD85qERzbVEfXRjF7B",
-		Value:           "0.01",
-		FromPrivateKey:  "55a70321542da0b6123f37180e61993d5769f0a5d727f9c817151c1270c290963a7b3874ba467be6b81ea361e3d7453af8b81c88aedd24b5031fdda0bc71ad32",
-		ContractAddress: "So11111111111111111111111111111111111111112",
-	}
+	t.Run("Invalid Public Key Format", func(t *testing.T) {
+		req := &account.ConvertAddressRequest{
+			Chain:     ChainName,
+			Network:   "mainnet",
+			PublicKey: invalidPublicKey,
+		}
+		resp, err := adaptor.ConvertAddress(req)
 
-	// 转换为 JSON
-	jsonBytes, err := json.Marshal(testTx)
-	if err != nil {
-		panic(err)
-	}
-
-	// 转换为 base64
-	base64Str := base64.StdEncoding.EncodeToString(jsonBytes)
-	return base64Str
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+	})
 }

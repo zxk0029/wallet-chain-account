@@ -3,26 +3,22 @@ package solana
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/programs/token"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/gagliardetto/solana-go/programs/system"
-	"github.com/mr-tron/base58"
-
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	//"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
+	"github.com/gagliardetto/solana-go/programs/token"
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
-
-	"encoding/json"
 )
 
 const ChainName = "Solana"
@@ -33,7 +29,8 @@ type ChainAdaptor struct {
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	cli, err := NewSolClient(conf)
+	rpcUrl := conf.WalletNode.Sol.RpcUrl
+	cli, err := NewSolHttpClient(rpcUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -42,13 +39,13 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 		return nil, err
 	}
 	return &ChainAdaptor{
-		solCli:  *cli,
+		solCli:  cli,
 		solData: sol,
 	}, nil
 
 }
 
-func (c ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*account.SupportChainsResponse, error) {
+func (c *ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*account.SupportChainsResponse, error) {
 	response := &account.SupportChainsResponse{
 		Code:    common2.ReturnCode_ERROR,
 		Msg:     "",
@@ -67,102 +64,98 @@ func (c ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*acco
 	return response, nil
 }
 
-func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*account.ConvertAddressResponse, error) {
-	publicKeyBytes, err := hex.DecodeString(req.PublicKey)
+func (c *ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*account.ConvertAddressResponse, error) {
+	response := &account.ConvertAddressResponse{
+		Code:    common2.ReturnCode_ERROR,
+		Msg:     "",
+		Address: "",
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		err := fmt.Errorf("ConvertAddress validateChainAndNetwork fail, err msg = %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	pubKeyHex := req.PublicKey
+	if ok, msg := validatePublicKey(pubKeyHex); !ok {
+		err := fmt.Errorf("ConvertAddress validatePublicKey fail, err msg = %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	accountAddress, err := PubKeyHexToAddress(pubKeyHex)
 	if err != nil {
-		return &account.ConvertAddressResponse{
-			Code:    common2.ReturnCode_ERROR,
-			Msg:     "convert address fail",
-			Address: common.Address{}.String(),
-		}, nil
+		err := fmt.Errorf("ConvertAddress PubKeyHexToAddress failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
 	}
-	address := solana.PublicKeyFromBytes(publicKeyBytes)
-	if err != nil {
-		return &account.ConvertAddressResponse{
-			Code:    common2.ReturnCode_ERROR,
-			Msg:     "invalid public key",
-			Address: common.Address{}.String(),
-		}, nil
-	}
-
-	if !address.IsOnCurve() {
-		return &account.ConvertAddressResponse{
-			Code:    common2.ReturnCode_ERROR,
-			Msg:     "public key is not on the curve",
-			Address: common.Address{}.String(),
-		}, nil
-	}
-
-	return &account.ConvertAddressResponse{
-		Code:    common2.ReturnCode_SUCCESS,
-		Msg:     "convert address success",
-		Address: address.String(),
-	}, nil
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "convert address success"
+	response.Address = accountAddress
+	return response, nil
 }
 
-func (c ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
-	if len(req.Address) == 0 {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: empty address",
-			Valid: false,
-		}, nil
+func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
+	response := &account.ValidAddressResponse{
+		Code:  common2.ReturnCode_ERROR,
+		Msg:   "",
+		Valid: false,
 	}
 
-	decoded, err := base58.Decode(req.Address)
-	if err != nil {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: not base58 encoded",
-			Valid: false,
-		}, nil
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		err := fmt.Errorf("ConvertAddress validateChainAndNetwork failed: %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return response, err
 	}
-
-	if len(decoded) != 32 {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address: wrong length",
-			Valid: false,
-		}, nil
+	address := req.Address
+	if len(address) == 0 {
+		err := fmt.Errorf("ConvertAddress address is empty")
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return response, err
 	}
-
-	return &account.ValidAddressResponse{
-		Code:  common2.ReturnCode_SUCCESS,
-		Msg:   "valid address",
-		Valid: true,
-	}, nil
+	if len(address) != 43 && len(address) != 44 {
+		err := fmt.Errorf("invalid Solana address length: expected 43 or 44 characters, got %d", len(address))
+		response.Msg = err.Error()
+		return response, err
+	}
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Valid = true
+	return response, nil
 }
 
-func (c ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
+func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
+func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
+func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
+func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
+func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
 	//req.ContractAddress as nonceAddress
-	nonceResult, err := c.solCli.GetNonce(req.ContractAddress)
-	if err != nil {
-		log.Error("get nonce by address fail", "err", err)
-		return &account.AccountResponse{
-			Code: common2.ReturnCode_ERROR,
-			Msg:  "get nonce by address fail",
-		}, nil
-	}
+	//nonceResult, err := c.solCli.GetNonce(req.ContractAddress)
+	//if err != nil {
+	//	log.Error("get nonce by address fail", "err", err)
+	//	return &account.AccountResponse{
+	//		Code: common2.ReturnCode_ERROR,
+	//		Msg:  "get nonce by address fail",
+	//	}, nil
+	//}
 	balanceResult, err := c.solCli.GetBalance(req.Address)
 	if err != nil {
 		return &account.AccountResponse{
@@ -176,33 +169,33 @@ func (c ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountR
 		Code:          common2.ReturnCode_SUCCESS,
 		Msg:           "get account response success",
 		AccountNumber: "0",
-		Sequence:      nonceResult,
-		Balance:       balanceResult,
+		//Sequence:      nonceResult,
+		//Balance:       balanceResult,
 	}, nil
 }
 
-func (c ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
+func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	TxResponse, err := c.solCli.SendTx(req.RawTx)
-	if err != nil {
-		return &account.SendTxResponse{
-			Code:   common2.ReturnCode_ERROR,
-			Msg:    "get tx response error",
-			TxHash: "0",
-		}, nil
-	}
+func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
+	//TxResponse, err := c.solCli.SendTx(req.RawTx)
+	//if err != nil {
+	//	return &account.SendTxResponse{
+	//		Code:   common2.ReturnCode_ERROR,
+	//		Msg:    "get tx response error",
+	//		TxHash: "0",
+	//	}, nil
+	//}
 	return &account.SendTxResponse{
-		Code:   common2.ReturnCode_SUCCESS,
-		Msg:    "get tx response success",
-		TxHash: TxResponse,
+		Code: common2.ReturnCode_SUCCESS,
+		Msg:  "get tx response success",
+		//TxHash: TxResponse,
 	}, nil
 }
 
-func (c ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
+func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
 	var resp *account2.TransactionResponse[account2.AccountTxResponse]
 	var err error
 	fmt.Println("req.ContractAddress", req.ContractAddress)
@@ -244,33 +237,33 @@ func (c ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.Tx
 	}
 }
 
-func (c ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashResponse, error) {
-	tx, err := c.solCli.GetTxByHash(req.Hash)
-	if err != nil {
-		return &account.TxHashResponse{
-			Code: common2.ReturnCode_ERROR,
-			Msg:  err.Error(),
-			Tx:   nil,
-		}, err
-	}
-	var value_list []*account.Value
-	value_list = append(value_list, &account.Value{Value: tx.Value})
+func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashResponse, error) {
+	//tx, err := c.solCli.GetTxByHash(req.Hash)
+	//if err != nil {
+	//	return &account.TxHashResponse{
+	//		Code: common2.ReturnCode_ERROR,
+	//		Msg:  err.Error(),
+	//		Tx:   nil,
+	//	}, err
+	//}
+	//var value_list []*account.Value
+	//value_list = append(value_list, &account.Value{Value: tx.Value})
 	return &account.TxHashResponse{
 		Tx: &account.TxMessage{
-			Hash:  tx.Hash,
-			Tos:   []*account.Address{{Address: tx.To}},
-			Froms: []*account.Address{{Address: tx.From}},
+			//Hash:  tx.Hash,
+			//Tos:   []*account.Address{{Address: tx.To}},
+			//Froms: []*account.Address{{Address: tx.From}},
 
-			Fee:    tx.Fee,
-			Status: account.TxStatus_Success,
-			Values: value_list,
-			Type:   tx.Type,
-			Height: tx.Height,
+			//Fee:    tx.Fee,
+			//Status: account.TxStatus_Success,
+			//Values: value_list,
+			//Type:   tx.Type,
+			//Height: tx.Height,
 		},
 	}, nil
 }
 
-func (c ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
+func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -458,17 +451,17 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 	}, nil
 }
 
-func (c ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
+func (c *ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
+func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
+func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -485,5 +478,21 @@ func validateChainAndNetwork(chain, network string) (bool, string) {
 	//if network != NetworkMainnet && network != NetworkTestnet {
 	//	return false, "invalid network"
 	//}
+	return true, ""
+}
+
+func validatePublicKey(pubKey string) (bool, string) {
+	if pubKey == "" {
+		return false, "public key cannot be empty"
+	}
+	pubKeyWithoutPrefix := strings.TrimPrefix(pubKey, "0x")
+
+	if len(pubKeyWithoutPrefix) != 64 {
+		return false, "invalid public key length"
+	}
+	if _, err := hex.DecodeString(pubKeyWithoutPrefix); err != nil {
+		return false, "invalid public key format: must be hex string"
+	}
+
 	return true, ""
 }

@@ -9,6 +9,9 @@ import (
 
 func TestGenerateKeyPair(t *testing.T) {
 	// Test basic functionality
+	// Generated Private Key (Hex): 88d592a872efde04ec0623db61f7d0eeccfc74b4f44b0c6dd0f4755829be413a7e376c64c64e88054b7a2d25dc716f45551d2f796ddc9e7be405e49c522b887c
+	// Generated Public Key (Hex): 7e376c64c64e88054b7a2d25dc716f45551d2f796ddc9e7be405e49c522b887c
+	// Generated Solana Address (Base58): 9VhPRjzizPY95TyBrve7heeJTZnofgkQYJpLxRSZGZ3H
 	t.Run("Basic Generation", func(t *testing.T) {
 		privateKey, publicKey, address, err := generateKeyPair()
 
