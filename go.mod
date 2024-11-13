@@ -184,6 +184,7 @@ require (
 	cosmossdk.io/store v1.1.0 // indirect
 	cosmossdk.io/x/tx v0.13.3 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
+	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
@@ -210,6 +211,7 @@ require (
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.uber.org/ratelimit v0.2.0 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

@@ -1,21 +1,28 @@
 package solana
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
+	"strconv"
 	"time"
 
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/mr-tron/base58"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/gagliardetto/solana-go"
+	//"github.com/gagliardetto/solana-go"
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
+
+	"encoding/json"
 )
 
 const ChainName = "Solana"
@@ -267,15 +274,188 @@ func (c ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accoun
 	//TODO implement me
 	panic("implement me")
 }
+func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
 
-func (c ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var data TxStructure
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+	valueFloat, err := strconv.ParseFloat(data.Value, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse value: %w", err)
+	}
+	value := uint64(valueFloat * 1000000000)
+	if err != nil {
+		return nil, err
+	}
+	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
+	if err != nil {
+		return nil, err
+	}
+	toPubkey, err := solana.PublicKeyFromBase58(data.ToAddress)
+	if err != nil {
+		return nil, err
+	}
+	var tx *solana.Transaction
+	if isSOLTransfer(data.ContractAddress) {
+		tx, err = solana.NewTransaction(
+			[]solana.Instruction{
+				system.NewTransferInstruction(
+					value,
+					fromPubkey,
+					toPubkey,
+				).Build(),
+			},
+			solana.MustHashFromBase58(data.Nonce),
+			solana.TransactionPayer(fromPubkey),
+		)
+
+	} else {
+		// SPL Token 转账
+		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
+
+		// 获取或创建发送方的代币账户
+		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			fromPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find from token account: %w", err)
+		}
+
+		// 获取或创建接收方的代币账户
+		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			toPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find to token account: %w", err)
+		}
+
+		tx, err = solana.NewTransaction(
+			[]solana.Instruction{
+				token.NewTransferInstruction(
+					value,
+					fromTokenAccount, // 使用找到的代币账户
+					toTokenAccount,   // 使用找到的代币账户
+					fromPubkey,
+					[]solana.PublicKey{},
+				).Build(),
+			},
+			solana.MustHashFromBase58(data.Nonce),
+			solana.TransactionPayer(fromPubkey),
+		)
+	}
+
+	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
+	return &account.UnSignTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "create un sign tx success",
+		UnSignTx: tx.String(),
+	}, nil
 }
-
 func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var data TxStructure
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+	valueFloat, err := strconv.ParseFloat(data.Value, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse value: %w", err)
+	}
+	value := uint64(valueFloat * 1000000000)
+	if err != nil {
+		return nil, err
+	}
+	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
+	if err != nil {
+		return nil, err
+	}
+	privateKeyBytes, err := hex.DecodeString(data.FromPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode private key: %w", err)
+	}
+	fromPrikey := solana.PrivateKey(privateKeyBytes)
+
+	toPubkey, err := solana.PublicKeyFromBase58(data.ToAddress)
+	if err != nil {
+		return nil, err
+	}
+	var tx *solana.Transaction
+	if isSOLTransfer(data.ContractAddress) {
+		tx, err = solana.NewTransaction(
+			[]solana.Instruction{
+				system.NewTransferInstruction(
+					value,
+					fromPubkey,
+					toPubkey,
+				).Build(),
+			},
+			solana.MustHashFromBase58(data.Nonce),
+			solana.TransactionPayer(fromPubkey),
+		)
+
+	} else {
+		// SPL Token 转账
+		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
+
+		// 获取或创建发送方的代币账户
+		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			fromPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find from token account: %w", err)
+		}
+
+		// 获取或创建接收方的代币账户
+		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			toPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find to token account: %w", err)
+		}
+
+		tx, err = solana.NewTransaction(
+			[]solana.Instruction{
+				token.NewTransferInstruction(
+					value,
+					fromTokenAccount, // 使用找到的代币账户
+					toTokenAccount,   // 使用找到的代币账户
+					fromPubkey,
+					[]solana.PublicKey{},
+				).Build(),
+			},
+			solana.MustHashFromBase58(data.Nonce),
+			solana.TransactionPayer(fromPubkey),
+		)
+	}
+
+	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
+	_, err = tx.Sign(
+		func(key solana.PublicKey) *solana.PrivateKey {
+			return &fromPrikey
+		},
+	)
+
+	return &account.SignedTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "create un sign tx success",
+		SignedTx: tx.String(),
+	}, nil
 }
 
 func (c ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
@@ -291,6 +471,11 @@ func (c ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequ
 func (c ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
 	//TODO implement me
 	panic("implement me")
+}
+func isSOLTransfer(coinAddress string) bool {
+	// SOL 的 wrapped token address 或空字符串
+	return coinAddress == "" ||
+		coinAddress == "So11111111111111111111111111111111111111112"
 }
 
 func validateChainAndNetwork(chain, network string) (bool, string) {
