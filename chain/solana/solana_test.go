@@ -70,23 +70,41 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 		Base64Tx: createTestBase64Tx(),
 	})
 	if err != nil {
-		log.Error("CreateUnSignTransaction failed:", err)
+		log.Error("TestChainAdaptor_BuildSignedTransaction failed:", err)
 		return
 	}
 
 	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
 	fmt.Println(resp.SignedTx)
 }
+func TestChainAdaptor_VerifySignedTransaction(t *testing.T) {
+	adaptor, err := setup()
+	if err != nil {
+		return
+	}
+
+	resp, err := adaptor.VerifySignedTransaction(&account.VerifyTransactionRequest{
+		Chain:     ChainName,
+		Network:   "mainnet",
+		Signature: "4MSGKyqDVHeGMWmSPHm5yDEmUcMdycc3LQsEq1Mu8HHGUjrUNRLV4TJPT1sbTyhyRhpMSdRW1ANty84asVQnEsmb2RupewnYX2jNjDobQ2deRA5q6sMcCrBVTeKjZ25PKuGKcxYgXDSEe2SZ6DPvg9BTLZgEKWTxNKKKGP4VPgYefhQ7grm3X9DHBnkLEpfxLUDzeGeMbESCPVw62wk1SVN1rzEGzpTfauvq3SzQb8n1PjAVaeSLkHqyy734yMJVvwWonPBDWQMAVwWomf4cFMKfQboR8ZBsp9cU7",
+	})
+	if err != nil {
+		log.Error("TestChainAdaptor_VerifySignedTransaction failed:", err)
+		return
+	}
+
+	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+}
 func createTestBase64Tx() string {
 
 	testTx := TxStructure{
-		Nonce:          "5k4cL62LqAaBU1hYh6nEhnQ5EonPPSxenLDxTn2VtMik",
-		FromAddress:    "7YcpSkLK7gnSJ4JpysHR9BQgwe2gfffRQmMxHDbNf5ve",
-		ToAddress:      "EUVrmoaKaSsHNkMFw7mVARR522wwH41BFRMha3WC8gha",
-		Value:          "0.01",
-		FromPrivateKey: "5XH7UVWU3q7qUwCga2sH55Gtfg1osdBmiRjGxCU3iECBEXqtvxSQcUjNGdpjWrLgS3dago1WGb15KuruTXMjJoR8",
-		//ContractAddress: "So11111111111111111111111111111111111111112",//5VzPuctbhMdqZBpxgxHCyH41sSckqPEKZ7qxbdgMN29Fbvmnpy3x6GcmUFxFw98oy3LcEEVCxwdr4gyQwcboSW6C
-		ContractAddress: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+		Nonce:           "7cNmDJkzZLyXqP9q6ccznkuy4UkxiJCEu9QnWAXcrwDe",
+		FromAddress:     "7YcpSkLK7gnSJ4JpysHR9BQgwe2gfffRQmMxHDbNf5ve",
+		ToAddress:       "EUVrmoaKaSsHNkMFw7mVARR522wwH41BFRMha3WC8gha",
+		Value:           "0.66",
+		FromPrivateKey:  "5XH7UVWU3q7qUwCga2sH55Gtfg1osdBmiRjGxCU3iECBEXqtvxSQcUjNGdpjWrLgS3dago1WGb15KuruTXMjJoR8",
+		ContractAddress: "So11111111111111111111111111111111111111112", //5VzPuctbhMdqZBpxgxHCyH41sSckqPEKZ7qxbdgMN29Fbvmnpy3x6GcmUFxFw98oy3LcEEVCxwdr4gyQwcboSW6C
+		//ContractAddress: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",//3L64aQvAmdhbaZJFdWXTSjLgmH1GwBhNE8eezqCFAHRvj9a76bwXoarivTSjzAJLiJ48CxtZ5Zke3djnfhuckKs
 	}
 
 	jsonBytes, err := json.Marshal(testTx)
