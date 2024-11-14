@@ -102,7 +102,7 @@ func createTestBase64Tx() string {
 		FromAddress:     "7YcpSkLK7gnSJ4JpysHR9BQgwe2gfffRQmMxHDbNf5ve",
 		ToAddress:       "EUVrmoaKaSsHNkMFw7mVARR522wwH41BFRMha3WC8gha",
 		Value:           "0.66",
-		FromPrivateKey:  "5XH7UVWU3q7qUwCga2sH55Gtfg1osdBmiRjGxCU3iECBEXqtvxSQcUjNGdpjWrLgS3dago1WGb15KuruTXMjJoR8",
+		FromPrivateKey:  "",
 		ContractAddress: "So11111111111111111111111111111111111111112", //5VzPuctbhMdqZBpxgxHCyH41sSckqPEKZ7qxbdgMN29Fbvmnpy3x6GcmUFxFw98oy3LcEEVCxwdr4gyQwcboSW6C
 		//ContractAddress: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",//3L64aQvAmdhbaZJFdWXTSjLgmH1GwBhNE8eezqCFAHRvj9a76bwXoarivTSjzAJLiJ48CxtZ5Zke3djnfhuckKs
 	}
