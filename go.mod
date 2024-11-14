@@ -21,7 +21,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.9.0
-	github.com/tendermint/tendermint v0.34.24
 	github.com/xssnick/tonutils-go v1.10.2
 	golang.org/x/crypto v0.27.0
 	google.golang.org/grpc v1.67.1
@@ -176,14 +175,16 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-require github.com/cometbft/cometbft v0.38.13
+require (
+	cosmossdk.io/math v1.3.0
+	github.com/cometbft/cometbft v0.38.13
+)
 
 require (
 	cosmossdk.io/collections v0.4.0 // indirect
 	cosmossdk.io/core v0.11.0 // indirect
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
-	cosmossdk.io/math v1.3.0 // indirect
 	cosmossdk.io/store v1.1.0 // indirect
 	cosmossdk.io/x/tx v0.13.3 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
