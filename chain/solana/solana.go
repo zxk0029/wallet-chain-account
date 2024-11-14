@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"github.com/gagliardetto/solana-go"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -15,16 +15,10 @@ import (
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/mr-tron/base58"
-
-	//"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/programs/system"
-	"github.com/gagliardetto/solana-go/programs/token"
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
@@ -366,7 +360,6 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 			[]solana.PublicKey{},
 		).Build()
 
-
 		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
 		if err != nil || accountInfo.Data == nil {
 
@@ -496,7 +489,6 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 			[]solana.PublicKey{},
 		).Build()
 
-		// 检查接收方是否需要创建 ATA
 		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
 		if err != nil || accountInfo.Data == nil {
 
@@ -505,7 +497,6 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 				toPubkey,
 				mintPubkey,
 			).Build()
-
 
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{createATAInstruction, transferInstruction},
