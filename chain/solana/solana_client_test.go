@@ -193,7 +193,7 @@ func TestSolClient_GetTransaction(t *testing.T) {
 		return
 	}
 
-	signature := "4mnTvsFsEGY3CKhjZ3X2U9wac8J4sS3uHywrHvUKViN8ta2TD22YghLiw2bQG7CmC47kDBfey1Mzw3HkEDAhwkXS"
+	signature := "5myqChdtQuwzHWN6dA74qGvuddqc3oB4RKcn6edXYDJWoMW8ZDaWEeA4mgXjNeP5DFRNAbnXKE8HgKcnKPhg1NAN"
 
 	t.Run("成功获取区块列表", func(t *testing.T) {
 		txResponse, err := solClient.GetTransaction(signature)

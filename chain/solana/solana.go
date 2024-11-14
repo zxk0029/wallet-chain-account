@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/gagliardetto/solana-go"
 	"strconv"
 	"strings"
 	"time"
@@ -13,36 +12,46 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
+	"github.com/gagliardetto/solana-go"
 )
 
 const ChainName = "Solana"
 
 type ChainAdaptor struct {
-	solCli  SolClient
-	solData *SolData
+	solCli    SolClient
+	sdkClient *rpc.Client
+	solData   *SolData
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	rpcUrl := conf.WalletNode.Sol.RpcUrl
-	cli, err := NewSolHttpClient(rpcUrl)
-	if err != nil {
-		return nil, err
-	}
-	sol, err := NewSolScanClient(conf.WalletNode.Sol.DataApiUrl, conf.WalletNode.Sol.DataApiKey, time.Duration(conf.WalletNode.Sol.TimeOut))
-	if err != nil {
-		return nil, err
-	}
-	return &ChainAdaptor{
-		solCli:  cli,
-		solData: sol,
-	}, nil
 
+	solHttpCli, err := NewSolHttpClient(rpcUrl)
+	if err != nil {
+		return nil, err
+	}
+	dataApiUrl := conf.WalletNode.Sol.DataApiUrl
+	dataApiKey := conf.WalletNode.Sol.DataApiKey
+	dataApiTimeOut := conf.WalletNode.Sol.TimeOut
+	solData, err := NewSolScanClient(dataApiUrl, dataApiKey, time.Duration(dataApiTimeOut))
+	if err != nil {
+		return nil, err
+	}
+
+	sdkClient := rpc.New(rpcUrl)
+
+	return &ChainAdaptor{
+		solCli:    solHttpCli,
+		sdkClient: sdkClient,
+		solData:   solData,
+	}, nil
 }
 
 func (c *ChainAdaptor) GetSupportChains(req *account.SupportChainsRequest) (*account.SupportChainsResponse, error) {
@@ -104,14 +113,14 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 	}
 
 	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
-		err := fmt.Errorf("ConvertAddress validateChainAndNetwork failed: %s", msg)
+		err := fmt.Errorf("ValidAddress validateChainAndNetwork failed: %s", msg)
 		log.Error("err", err)
 		response.Msg = err.Error()
 		return response, err
 	}
 	address := req.Address
 	if len(address) == 0 {
-		err := fmt.Errorf("ConvertAddress address is empty")
+		err := fmt.Errorf("ValidAddress address is empty")
 		log.Error("err", err)
 		response.Msg = err.Error()
 		return response, err
@@ -127,51 +136,149 @@ func (c *ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.
 }
 
 func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	response := &account.BlockResponse{
+		Code:         common2.ReturnCode_ERROR,
+		Msg:          "",
+		Height:       0,
+		Hash:         "",
+		BaseFee:      "",
+		Transactions: nil,
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, ""); !ok {
+		err := fmt.Errorf("GetBlockByNumber validateChainAndNetwork failed: %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	resultSlot := uint64(req.Height)
+	if req.Height == 0 {
+		latestSlot, err := c.solCli.GetSlot(Finalized)
+		if err != nil {
+			err := fmt.Errorf("GetBlockByNumber GetSlot failed: %w", err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+		resultSlot = latestSlot
+	}
+
+	blockResult := &BlockResult{}
+	if req.ViewTx {
+		tempBlockBySlot, err := c.solCli.GetBlockBySlot(resultSlot, Signatures)
+		if err != nil {
+			err := fmt.Errorf("GetBlockByNumber GetBlockBySlot failed: %w", err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+		blockResult = tempBlockBySlot
+	} else {
+		tempBlockBySlot, err := c.solCli.GetBlockBySlot(resultSlot, None)
+		if err != nil {
+			err := fmt.Errorf("GetBlockByNumber GetBlockBySlot failed: %w", err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+		blockResult = tempBlockBySlot
+	}
+
+	response.Hash = blockResult.BlockHash
+	response.Height = int64(resultSlot)
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "GetBlockByNumber success"
+	if req.ViewTx {
+		response.Transactions = make([]*account.BlockInfoTransactionList, 0, len(blockResult.Signatures))
+		for _, signature := range blockResult.Signatures {
+			txInfo := &account.BlockInfoTransactionList{
+				Hash: signature,
+			}
+			response.Transactions = append(response.Transactions, txInfo)
+		}
+	}
+	return response, nil
 }
 
 func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.BlockResponse, error) {
-	//TODO implement me
+	response := &account.BlockResponse{
+		Code:         common2.ReturnCode_ERROR,
+		Msg:          "",
+		Height:       0,
+		Hash:         "",
+		BaseFee:      "",
+		Transactions: nil,
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, ""); !ok {
+		response.Msg = msg
+		err := fmt.Errorf("GetBlockByHash validateChainAndNetwork fail, err msg = %s", msg)
+		return response, err
+	}
 	panic("implement me")
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest) (*account.BlockHeaderResponse, error) {
-	//TODO implement me
+	response := &account.BlockHeaderResponse{
+		Code:        common2.ReturnCode_ERROR,
+		Msg:         "",
+		BlockHeader: nil,
+	}
+
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		response.Msg = msg
+		err := fmt.Errorf("GetBlockHeaderByHash validateChainAndNetwork fail, err msg = %s", msg)
+		return response, err
+	}
 	panic("implement me")
 }
 
 func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequest) (*account.BlockHeaderResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	response := &account.BlockHeaderResponse{
+		Code:        common2.ReturnCode_ERROR,
+		Msg:         "",
+		BlockHeader: nil,
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, ""); !ok {
+		err := fmt.Errorf("GetBlockHeaderByNumber validateChainAndNetwork failed: %s", msg)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+
+	resultSlot := uint64(req.Height)
+	if req.Height == 0 {
+		latestSlot, err := c.solCli.GetSlot(Finalized)
+		if err != nil {
+			err := fmt.Errorf("GetBlockHeaderByNumber GetSlot failed: %w", err)
+			log.Error("err", err)
+			response.Msg = err.Error()
+			return nil, err
+		}
+		resultSlot = latestSlot
+	}
+
+	blockResult, err := c.solCli.GetBlockBySlot(resultSlot, None)
+	if err != nil {
+		err := fmt.Errorf("GetBlockHeaderByNumber GetBlockBySlot failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	blockHead := &account.BlockHeader{
+		Hash:       blockResult.BlockHash,
+		Number:     strconv.FormatUint(resultSlot, 10),
+		ParentHash: blockResult.PreviousBlockhash,
+		Time:       uint64(blockResult.BlockTime),
+	}
+
+	response.BlockHeader = blockHead
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "GetBlockHeaderByNumber success"
+	return response, nil
 }
 
 func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
-	//req.ContractAddress as nonceAddress
-	//nonceResult, err := c.solCli.GetNonce(req.ContractAddress)
-	//if err != nil {
-	//	log.Error("get nonce by address fail", "err", err)
-	//	return &account.AccountResponse{
-	//		Code: common2.ReturnCode_ERROR,
-	//		Msg:  "get nonce by address fail",
-	//	}, nil
-	//}
-	balanceResult, err := c.solCli.GetBalance(req.Address)
-	if err != nil {
-		return &account.AccountResponse{
-			Code:    common2.ReturnCode_ERROR,
-			Msg:     "get token balance fail",
-			Balance: "0",
-		}, err
-	}
-	log.Info("balance result", "balance=", balanceResult, "balanceStr=", balanceResult)
-	return &account.AccountResponse{
-		Code:          common2.ReturnCode_SUCCESS,
-		Msg:           "get account response success",
-		AccountNumber: "0",
-		//Sequence:      nonceResult,
-		//Balance:       balanceResult,
-	}, nil
+	//TODO implement me
+	panic("implement me")
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {

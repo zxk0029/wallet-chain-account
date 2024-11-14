@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/gagliardetto/solana-go"
 
 	"github.com/cosmos/btcutil/base58"
 )
@@ -73,4 +74,57 @@ func PubKeyHexToAddress(publicKeyHex string) (string, error) {
 		return "", err
 	}
 	return PubKeyToAddress(pubKey)
+}
+
+func GenerateNewKeypair() (*solana.PrivateKey, solana.PublicKey) {
+	account := solana.NewWallet()
+	return &account.PrivateKey, account.PublicKey()
+}
+
+func PrivateKeyFromByteList(privateKeyByteList []byte) (*solana.PrivateKey, error) {
+	if len(privateKeyByteList) != 64 {
+		return nil, fmt.Errorf("invalid private key length")
+	}
+	privateKey := solana.PrivateKey(privateKeyByteList)
+	return &privateKey, nil
+}
+
+func PrivateKeyFromHex(privateKeyHex string) (*solana.PrivateKey, error) {
+	privateKeyBytes, err := hex.DecodeString(privateKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("decode hex error: %w", err)
+	}
+	return PrivateKeyFromByteList(privateKeyBytes)
+}
+
+func PrivateKeyFromBase58(privateKeyBase58 string) (*solana.PrivateKey, error) {
+	privateKey, err := solana.PrivateKeyFromBase58(privateKeyBase58)
+	if err != nil {
+		return nil, fmt.Errorf("create private key from base58 error: %w", err)
+	}
+	return &privateKey, nil
+}
+
+func PrivateKeyToBase58(privateKey *solana.PrivateKey) string {
+	return privateKey.String()
+}
+
+func PublicKeyFromPrivateKey(privateKey *solana.PrivateKey) solana.PublicKey {
+	return privateKey.PublicKey()
+}
+
+func PublicKeyFromBase58(publicKeyBase58 string) (solana.PublicKey, error) {
+	publicKey, err := solana.PublicKeyFromBase58(publicKeyBase58)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("create public key error: %w", err)
+	}
+	return publicKey, nil
+}
+
+func PublicKeyToBase58(publicKey solana.PublicKey) string {
+	return publicKey.String()
+}
+
+func AddressFromPubKey(publicKey solana.PublicKey) string {
+	return publicKey.String()
 }

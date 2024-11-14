@@ -1,5 +1,10 @@
 package solana
 
+type RPCError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
 type GetAccountInfoResponse struct {
 	JsonRPC string `json:"jsonrpc"`
 	ID      int    `json:"id"`
@@ -76,6 +81,7 @@ type GetBlockRequest struct {
 type GetBlockResponse struct {
 	JsonRPC string      `json:"jsonrpc"`
 	ID      int         `json:"id"`
+	Error   *RPCError   `json:"error,omitempty"`
 	Result  BlockResult `json:"result"`
 }
 
@@ -113,17 +119,18 @@ type Status struct {
 	Ok interface{} `json:"Ok"`
 }
 
-type GetTransactionRequest struct {
-	Encoding   string `json:"encoding,omitempty"`
-	Commitment string `json:"commitment,omitempty"`
-	// max version
-	// Legacy = 0, no other version
-	MaxSupportedTransactionVersion uint64 `json:"maxSupportedTransactionVersion,omitempty"`
-}
+//type GetTransactionRequest struct {
+//	Encoding   string `json:"encoding,omitempty"`
+//	Commitment string `json:"commitment,omitempty"`
+//	// max version
+//	// Legacy = 0, no other version
+//	MaxSupportedTransactionVersion string `json:"maxSupportedTransactionVersion,omitempty"`
+//}
 
 type GetTransactionResponse struct {
-	Jsonrpc string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	Jsonrpc string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	Result  struct {
 		Slot        uint64          `json:"slot"`
 		BlockTime   *int64          `json:"blockTime"`

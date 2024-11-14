@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
+	"github.com/gagliardetto/solana-go/rpc"
 	"log"
 	"sort"
 	"strings"
@@ -26,7 +29,7 @@ type SolClient interface {
 
 	GetSlot(commitment CommitmentType) (uint64, error)
 	GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64, error)
-	GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*GetBlockResponse, error)
+	GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*BlockResult, error)
 
 	GetTransaction(signature string) (*GetTransactionResponse, error)
 	GetTransactionRange(signatures []string) ([]*GetTransactionResponse, error)
@@ -306,7 +309,7 @@ func (s *solclient) GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64
 	return resp.Result, nil
 }
 
-func (s *solclient) GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*GetBlockResponse, error) {
+func (s *solclient) GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*BlockResult, error) {
 	//s.grestyClient.SetTimeout(120 * time.Second)
 	//defer s.grestyClient.SetTimeout(defaultRequestTimeout)
 
@@ -338,14 +341,18 @@ func (s *solclient) GetBlockBySlot(slot uint64, detailType TransactionDetailsTyp
 		return nil, fmt.Errorf("failed to get block: %w", errHTTPError)
 	}
 
-	return resp, nil
+	if resp.Error != nil {
+		return nil, fmt.Errorf("RPC error: (code: %d) %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	return &resp.Result, nil
 }
 
 func (s *solclient) GetTransaction(signature string) (*GetTransactionResponse, error) {
-	config := GetTransactionRequest{
-		Commitment:                     string(Finalized),
-		Encoding:                       "json",
-		MaxSupportedTransactionVersion: 0,
+	config := map[string]interface{}{
+		"encoding":                       "json",
+		"commitment":                     Finalized,
+		"maxSupportedTransactionVersion": 0,
 	}
 
 	requestBody := map[string]interface{}{
@@ -360,12 +367,16 @@ func (s *solclient) GetTransaction(signature string) (*GetTransactionResponse, e
 		SetBody(requestBody).
 		SetResult(resp).
 		Post("/")
+
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
 	if httpResp.IsError() {
 		return nil, fmt.Errorf("failed to get transaction: %w", errHTTPError)
+	}
+	if resp.Error != nil {
+		return nil, fmt.Errorf("RPC error: (code: %d) %s", resp.Error.Code, resp.Error.Message)
 	}
 
 	return resp, nil
@@ -639,4 +650,17 @@ func (s *solclient) SendTransaction(
 	}
 
 	return resp.Result, nil
+}
+
+func GetNonceAccount(client *rpc.Client, nonceAccountPubkey solana.PublicKey) error {
+	nonceAccountInfo, err := client.GetAccountInfo(ctx, nonceAccountPubkey)
+	if err != nil {
+		return fmt.Errorf("get nonce account error: %w", err)
+	}
+
+	// 2. 解析 nonce 数据
+	nonceData, err := system.NonceAccount(nonceAccountInfo.Value.Data.GetBinary())
+	if err != nil {
+		return fmt.Errorf("parse nonce data error: %w", err)
+	}
 }

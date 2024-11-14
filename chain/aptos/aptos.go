@@ -176,7 +176,6 @@ func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accou
 		BaseFee:      "",
 		Transactions: nil,
 	}
-
 	if ok, msg := validateChainAndNetwork(req.Chain, ""); !ok {
 		err := fmt.Errorf("GetBlockByNumber validateChainAndNetwork default failed: %s", msg)
 		log.Error("err", err)
