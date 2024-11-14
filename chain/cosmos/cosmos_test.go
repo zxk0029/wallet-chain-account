@@ -28,7 +28,7 @@ func TestCosmos_ConvertAddress(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
 	request := &account.ConvertAddressRequest{
-		PublicKey: "036e8f01c6e68d9c5c66ab172ff0898234c7a889997802437bce6e7d1f89161fc1",
+		PublicKey: "032d535553c70dfbb9c13f32cb6d1002a4b421beff39009670e29a7e51fb88ec3f",
 	}
 	response, err := chainAdaptor.ConvertAddress(request)
 	assert.NoError(t, err)
@@ -121,6 +121,19 @@ func TestCosmos_GetTxByAddress(t *testing.T) {
 	response, err := chainAdaptor.GetTxByAddress(request)
 	assert.NoError(t, err)
 	fmt.Println("response", response)
+}
+
+func TestCosmos_SendTx(t *testing.T) {
+	chainAdaptor, err := getChainAdaptor()
+	assert.NoError(t, err)
+
+	req := &account.SendTxRequest{
+		//RawTx: "CpoBCo8BChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEm8KLWNvc21vczE5dGh4c3VubDlsenl3Z2xzbmR0aDVhMjc4d3RhdmF3enpwdjQ0cRItY29zbW9zMWw2dnVsMjBxNzRndzU2ZnBlZDhzcmtqcTJ4OGQ5bTMwNWdueHIyGg8KBXVhdG9tEgYxMDAwMDASBjEwMTExMRJoClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDi7ANMzipos1bc45s2u2g+ar2Fu1+Z8lkzFTUtoDjIccSBAoCCAEYChIUCg4KBXVhdG9tEgUxMDAwMBDKswgaQAW5UeOw1oNp6SJQCwbVc10wdBB6lJ1MGVRuTA2i8lUtZbzgeYbU+TJd67iR0UAkjzYvjFI/R18dKlEbmboRykw=",
+		RawTx: "CpoBCo8BChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEm8KLWNvc21vczE5dGh4c3VubDlsenl3Z2xzbmR0aDVhMjc4d3RhdmF3enpwdjQ0cRItY29zbW9zMWw2dnVsMjBxNzRndzU2ZnBlZDhzcmtqcTJ4OGQ5bTMwNWdueHIyGg8KBXVhdG9tEgYxMDAwMDASBjEwMTExMRJoClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDi7ANMzipos1bc45s2u2g+ar2Fu1+Z8lkzFTUtoDjIccSBAoCCAEYChIUCg4KBXVhdG9tEgUxMDAwMBDKswgaQAW5UeOw1oNp6SJQCwbVc10wdBB6lJ1MGVRuTA2i8lUtZbzgeYbU+TJd67iR0UAkjzYvjFI/R18dKlEbmboRykw=",
+	}
+	response, err := chainAdaptor.SendTx(req)
+	assert.NoError(t, err)
+	fmt.Printf("response TxHash=%s \n", response.TxHash)
 }
 
 func TestCosmos_GetBlockByRange(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	cmtjson "github.com/cometbft/cometbft/libs/json"
 	"strconv"
 	"testing"
 
@@ -121,6 +122,35 @@ func TestClient_BlockchainInfo(t *testing.T) {
 	response, err := c.BlockchainInfo(22879895, 22879896)
 	assert.NoError(t, err)
 	fmt.Printf("result: %v \n", response.LastHeight)
+}
+
+func TestClient_BroadcastTx(t *testing.T) {
+	config, _ := getWalletConfig()
+	c, err := DialCosmosClient(context.Background(), config)
+	assert.NoError(t, err)
+
+	var txMap map[string]interface{} = make(map[string]interface{})
+	txMsg := "CpoBCo8BChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEm8KLWNvc21vczE5dGh4c3VubDlsenl3Z2xzbmR0aDVhMjc4d3RhdmF3enpwdjQ0cRItY29zbW9zMWw2dnVsMjBxNzRndzU2ZnBlZDhzcmtqcTJ4OGQ5bTMwNWdueHIyGg8KBXVhdG9tEgYxMDAwMDASBjEwMTExMRJoClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDi7ANMzipos1bc45s2u2g+ar2Fu1+Z8lkzFTUtoDjIccSBAoCCAEYChIUCg4KBXVhdG9tEgUxMDAwMBDKswgaQAW5UeOw1oNp6SJQCwbVc10wdBB6lJ1MGVRuTA2i8lUtZbzgeYbU+TJd67iR0UAkjzYvjFI/R18dKlEbmboRykw="
+	txMap["tx"] = txMsg
+	//decbytes, _ := hex.DecodeString(txMsg)
+
+	//var paramsMap = make(map[string]json.RawMessage, 1)
+
+	t1, err := cmtjson.Marshal(txMap["tx"])
+	fmt.Printf("t1: %s , err: %s \n", t1, err)
+	//
+	//txBytes := t1
+	//target := reflect.New(reflect.TypeOf(txMsg)).Interface()
+	//resErr := cmtjson.Unmarshal(txBytes, target)
+	//
+	//actual := reflect.ValueOf(target).Elem().Interface()
+	//fmt.Printf("result: %v , err: %s , actual:%s \n", txMsg, resErr.Error(), actual)
+
+	//cmtjson.Marshal()
+
+	resp, err := c.BroadcastTx([]byte(txMsg))
+	assert.NoError(t, err)
+	fmt.Printf("result: %v \n", resp.Hash.String())
 }
 
 // success

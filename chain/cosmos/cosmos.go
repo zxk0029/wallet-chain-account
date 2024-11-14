@@ -2,7 +2,9 @@ package cosmos
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/ptypes"
 
-	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
@@ -104,12 +105,12 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 		log.Error("get account error (%w)", err)
 		return nil, err
 	}
-
 	authAccount := new(authv1beta1.BaseAccount)
 	if err := ptypes.UnmarshalAny(response.Account, authAccount); err != nil {
 		log.Error("get account error (%w)", err)
 		return nil, err
 	}
+	// balance
 	balance, err := c.cosData.GetThirdNativeBalance(req.Address)
 	if err != nil {
 		log.Error("get account error (%w)", err)
@@ -173,13 +174,27 @@ func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest)
 		log.Error("get block header by hash error (%w)", err)
 		return nil, err
 	}
-	// todo gas field
+
+	height := strconv.FormatInt(header.Header.Height, 10)
+	response, err := c.cosData.GetThirdBlockDetail(height)
+	if err != nil {
+		log.Error("get block header by hash error (%w)", err)
+		return nil, err
+	}
+
+	// field
+	gasLimit, _ := strconv.ParseUint(response.Response[0].GasLimit, 10, 64)
+	gasUsed, _ := strconv.ParseUint(response.Response[0].GasUsed, 10, 64)
+	blobGasUsed, _ := strconv.ParseUint(response.Response[0].TotalFee, 10, 64)
 	blockHeader := &account.BlockHeader{
-		Hash:       header.Header.Hash().String(),
-		TxHash:     header.Header.DataHash.String(),
-		ParentHash: header.Header.AppHash.String(),
-		Number:     strconv.FormatInt(header.Header.Height, 10),
-		Time:       uint64(header.Header.Time.Unix()),
+		Hash:        header.Header.Hash().String(),
+		TxHash:      header.Header.DataHash.String(),
+		ParentHash:  header.Header.AppHash.String(),
+		Number:      response.Response[0].TxnCount,
+		Time:        uint64(header.Header.Time.Unix()),
+		GasLimit:    gasLimit,
+		GasUsed:     gasUsed,
+		BlobGasUsed: blobGasUsed,
 	}
 	return &account.BlockHeaderResponse{
 		Code:        common2.ReturnCode_SUCCESS,
@@ -194,13 +209,25 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 		log.Error("get block header by number error (%w)", err)
 		return nil, err
 	}
-	// todo gas field
+	height := strconv.FormatInt(req.Height, 10)
+	response, err := c.cosData.GetThirdBlockDetail(height)
+	if err != nil {
+		log.Error("get block header by hash error (%w)", err)
+		return nil, err
+	}
+	// field
+	gasLimit, _ := strconv.ParseUint(response.Response[0].GasLimit, 10, 64)
+	gasUsed, _ := strconv.ParseUint(response.Response[0].GasUsed, 10, 64)
+	blobGasUsed, _ := strconv.ParseUint(response.Response[0].TotalFee, 10, 64)
 	blockHeader := &account.BlockHeader{
-		Hash:       header.Header.Hash().String(),
-		TxHash:     header.Header.DataHash.String(),
-		ParentHash: header.Header.AppHash.String(),
-		Number:     strconv.FormatInt(header.Header.Height, 10),
-		Time:       uint64(header.Header.Time.Unix()),
+		Hash:        header.Header.Hash().String(),
+		TxHash:      header.Header.DataHash.String(),
+		ParentHash:  header.Header.AppHash.String(),
+		Number:      response.Response[0].TxnCount,
+		Time:        uint64(header.Header.Time.Unix()),
+		GasLimit:    gasLimit,
+		GasUsed:     gasUsed,
+		BlobGasUsed: blobGasUsed,
 	}
 	return &account.BlockHeaderResponse{
 		Code:        common2.ReturnCode_SUCCESS,
@@ -209,53 +236,51 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 	}, nil
 }
 
-func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	ret, err := c.client.BroadcastTx([]byte(req.RawTx))
-	if err != nil {
-		return &account.SendTxResponse{
+func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
+	var err error
+	page := strconv.FormatUint(uint64(req.Page), 10)
+	if req.Pagesize > 10000 || req.Page < 1 {
+		return &account.TxAddressResponse{
 			Code: common2.ReturnCode_ERROR,
-			Msg:  "BroadcastTx fail",
+			Msg:  "get transactions by address fail! page size over maximum size",
+		}, nil
+	}
+	pageSize := strconv.FormatUint(uint64(req.Pagesize), 10)
+
+	transactionResp, err := c.cosData.GetThirdTxByAddress(req.Address, page, pageSize)
+	if err != nil {
+		return &account.TxAddressResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get third tx by address fail! page size over maximum size",
 		}, err
 	}
-	return &account.SendTxResponse{
-		Code:   common2.ReturnCode_SUCCESS,
-		Msg:    "send tx success",
-		TxHash: ret.TxResponse.TxHash,
-	}, nil
-}
 
-// todo-底层url不对需要重新封装
-func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error) {
-	var resp *account2.TransactionResponse[account2.AccountTxResponse]
-	var err error
-	if req.ContractAddress != "0x00" {
-		resp, err = c.client.GetTxByAddress(uint64(req.Page), uint64(req.Pagesize), req.Address, "token")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		resp, err = c.client.GetTxByAddress(uint64(req.Page), uint64(req.Pagesize), req.Address, "normal")
-		if err != nil {
-			return nil, err
-		}
-	}
-	txs := resp.TransactionList
+	txs := transactionResp.Data.TransactionList
 	list := make([]*account.TxMessage, 0, len(txs))
+
 	for i := 0; i < len(txs); i++ {
+		fromList := make([]*account.Address, 0, len(txs[i].From))
+		for j := 0; j < len(txs[i].From); j++ {
+			fromList = append(fromList, &account.Address{Address: txs[i].From[j]})
+		}
+		toList := make([]*account.Address, 0, len(txs[i].To))
+		for j := 0; j < len(txs[i].To); j++ {
+			toList = append(toList, &account.Address{Address: txs[i].To[j]})
+		}
 		list = append(list, &account.TxMessage{
 			Hash:   txs[i].TxId,
-			Tos:    []*account.Address{{Address: txs[i].To}},
-			Froms:  []*account.Address{{Address: txs[i].From}},
+			Froms:  fromList,
+			Tos:    toList,
 			Fee:    txs[i].TxFee,
 			Status: account.TxStatus_Success,
-			Values: []*account.Value{{Value: txs[i].Amount}},
+			Values: []*account.Value{{Value: txs[i].Value}},
 			Type:   1,
 			Height: txs[i].Height,
 		})
 	}
 	return &account.TxAddressResponse{
 		Code: common2.ReturnCode_SUCCESS,
-		Msg:  "get transactions by address success",
+		Msg:  "get tx by address success",
 		Tx:   list,
 	}, err
 }
@@ -311,7 +336,6 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 	}, nil
 }
 
-// todo
 func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
 	minHeight, err := strconv.ParseInt(req.GetStart(), 10, 64)
 	if err != nil {
@@ -329,18 +353,83 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 			Msg:  "get block range fail ! start height err",
 		}, err
 	}
-	blockInfo, err := c.client.BlockchainInfo(minHeight, maxHeight)
-	log.Info("block metas len: %d", len(blockInfo.BlockMetas))
+	blockInfos, err := c.client.BlockchainInfo(minHeight, maxHeight)
+	if err != nil {
+		log.Error("max height invalid", err)
+		return &account.BlockByRangeResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "get block chain info fail !",
+		}, err
+	}
+	var blockHeaderList []*account.BlockHeader
+	for _, blockInfo := range blockInfos.BlockMetas {
+
+		heightStr := strconv.FormatInt(blockInfo.Header.Height, 10)
+		blockDetail, err := c.cosData.GetThirdBlockDetail(heightStr)
+		if err != nil {
+			log.Error("get block header by hash error (%w)", err)
+			return nil, err
+		}
+		gasLimit, _ := strconv.ParseUint(blockDetail.Response[0].GasLimit, 10, 64)
+		gasUsed, _ := strconv.ParseUint(blockDetail.Response[0].GasUsed, 10, 64)
+		blobGasUsed, _ := strconv.ParseUint(blockDetail.Response[0].TotalFee, 10, 64)
+		blockHeader := &account.BlockHeader{
+			Hash:        blockInfo.Header.Hash().String(),
+			TxHash:      blockInfo.Header.DataHash.String(),
+			ParentHash:  blockInfo.Header.AppHash.String(),
+			Number:      blockDetail.Response[0].TxnCount,
+			Time:        uint64(blockInfo.Header.Time.Unix()),
+			GasLimit:    gasLimit,
+			GasUsed:     gasUsed,
+			BlobGasUsed: blobGasUsed,
+		}
+		blockHeaderList = append(blockHeaderList, blockHeader)
+	}
+	log.Info("block header list", "len", len(blockHeaderList))
 	return &account.BlockByRangeResponse{
-		Code: common2.ReturnCode_SUCCESS,
-		Msg:  "get block by range success",
+		Code:        common2.ReturnCode_SUCCESS,
+		Msg:         "get block by range success",
+		BlockHeader: blockHeaderList,
+	}, nil
+}
+
+func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
+	ret, err := c.client.BroadcastTx([]byte(req.RawTx))
+	if err != nil {
+		return &account.SendTxResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "BroadcastTx fail",
+		}, err
+	}
+
+	return &account.SendTxResponse{
+		Code:   common2.ReturnCode_SUCCESS,
+		Msg:    "send tx success",
+		TxHash: ret.Hash.String(),
 	}, nil
 }
 
 func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var txStruct TxStructure
+	if err := json.Unmarshal(jsonBytes, &txStruct); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+
+	bytes, err := BuildUnSignTransaction(&txStruct)
+	if err != nil {
+		log.Error("build unsign transaction fail", "err", err)
+		return nil, err
+	}
 	return &account.UnSignTransactionResponse{
-		Code: common2.ReturnCode_SUCCESS,
-		Msg:  "create unsigned transaction success",
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "create unsigned transaction success",
+		UnSignTx: string(bytes),
 	}, nil
 }
 
