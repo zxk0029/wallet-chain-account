@@ -1,17 +1,24 @@
 package solana
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/gagliardetto/solana-go"
+	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
+
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/mr-tron/base58"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
@@ -277,8 +284,31 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 }
 
 func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	//req.ContractAddress as nonceAddress
+	//nonceResult, err := c.solCli.GetNonce(req.ContractAddress)
+	//if err != nil {
+	//	log.Error("get nonce by address fail", "err", err)
+	//	return &account.AccountResponse{
+	//		Code: common2.ReturnCode_ERROR,
+	//		Msg:  "get nonce by address fail",
+	//	}, nil
+	//}
+	balanceResult, err := c.solCli.GetBalance(req.Address)
+	if err != nil {
+		return &account.AccountResponse{
+			Code:    common2.ReturnCode_ERROR,
+			Msg:     "get token balance fail",
+			Balance: "0",
+		}, err
+	}
+	log.Info("balance result", "balance=", balanceResult, "balanceStr=", balanceResult)
+	return &account.AccountResponse{
+		Code:          common2.ReturnCode_SUCCESS,
+		Msg:           "get account response success",
+		AccountNumber: "0",
+		//Sequence:      nonceResult,
+		//Balance:       balanceResult,
+	}, nil
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
@@ -394,6 +424,11 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 	if err != nil {
 		return nil, err
 	}
+
+	fromPrikey, err := getPrivateKey(data.FromPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode private key: %w", err)
+	}
 	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
 	if err != nil {
 		return nil, err
@@ -417,42 +452,81 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 		)
 
 	} else {
-		// SPL Token 转账
+
 		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
 
-		// 获取或创建发送方的代币账户
 		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			fromPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find from token account: %w", err)
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
 		}
 
-		// 获取或创建接收方的代币账户
 		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			toPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find to token account: %w", err)
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
 		}
 
-		tx, err = solana.NewTransaction(
-			[]solana.Instruction{
-				token.NewTransferInstruction(
-					value,
-					fromTokenAccount, // 使用找到的代币账户
-					toTokenAccount,   // 使用找到的代币账户
-					fromPubkey,
-					[]solana.PublicKey{},
-				).Build(),
-			},
-			solana.MustHashFromBase58(data.Nonce),
-			solana.TransactionPayer(fromPubkey),
-		)
+		tokenInfo, err := c.solCli.Client.GetTokenSupply(context.Background(), data.ContractAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token info: %w", err)
+		}
+		decimals := tokenInfo.Decimals
+
+		valueFloat, err := strconv.ParseFloat(data.Value, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse value: %w", err)
+		}
+		actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
+
+		transferInstruction := token.NewTransferInstruction(
+			actualValue,
+			fromTokenAccount,
+			toTokenAccount,
+			fromPubkey,
+			[]solana.PublicKey{},
+		).Build()
+
+		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
+		if err != nil || accountInfo.Data == nil {
+
+			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
+				fromPubkey,
+				toPubkey,
+				mintPubkey,
+			).Build()
+
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{createATAInstruction, transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		} else {
+			// 直接创建转账交易
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		}
 	}
 
+	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
+	_, err = tx.Sign(
+		func(key solana.PublicKey) *solana.PrivateKey {
+			return &fromPrikey
+		},
+	)
+
+	//	signedTx := tx.String()
+	spew.Dump(tx)
+	if err := tx.VerifySignatures(); err != nil {
+		log.Info("Invalid signatures: %v", err)
+	}
 	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
 	return &account.UnSignTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
@@ -479,16 +553,15 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 	if err != nil {
 		return nil, err
 	}
+
+	fromPrikey, err := getPrivateKey(data.FromPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode private key: %w", err)
+	}
 	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
 	if err != nil {
 		return nil, err
 	}
-	privateKeyBytes, err := hex.DecodeString(data.FromPrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode private key: %w", err)
-	}
-	fromPrikey := solana.PrivateKey(privateKeyBytes)
-
 	toPubkey, err := solana.PublicKeyFromBase58(data.ToAddress)
 	if err != nil {
 		return nil, err
@@ -508,40 +581,67 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 		)
 
 	} else {
-		// SPL Token 转账
+
 		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
 
-		// 获取或创建发送方的代币账户
 		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			fromPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find from token account: %w", err)
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
 		}
 
-		// 获取或创建接收方的代币账户
 		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			toPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find to token account: %w", err)
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
 		}
 
-		tx, err = solana.NewTransaction(
-			[]solana.Instruction{
-				token.NewTransferInstruction(
-					value,
-					fromTokenAccount, // 使用找到的代币账户
-					toTokenAccount,   // 使用找到的代币账户
-					fromPubkey,
-					[]solana.PublicKey{},
-				).Build(),
-			},
-			solana.MustHashFromBase58(data.Nonce),
-			solana.TransactionPayer(fromPubkey),
-		)
+		tokenInfo, err := c.solCli.Client.GetTokenSupply(context.Background(), data.ContractAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token info: %w", err)
+		}
+		decimals := tokenInfo.Decimals
+
+		valueFloat, err := strconv.ParseFloat(data.Value, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse value: %w", err)
+		}
+		actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
+
+		transferInstruction := token.NewTransferInstruction(
+			actualValue,
+			fromTokenAccount,
+			toTokenAccount,
+			fromPubkey,
+			[]solana.PublicKey{},
+		).Build()
+
+		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
+		if err != nil || accountInfo.Data == nil {
+
+			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
+				fromPubkey,
+				toPubkey,
+				mintPubkey,
+			).Build()
+
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{createATAInstruction, transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		} else {
+
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		}
 	}
 
 	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
@@ -551,10 +651,27 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 		},
 	)
 
+	//	signedTx := tx.String()
+	spew.Dump(tx)
+	if err := tx.VerifySignatures(); err != nil {
+		log.Info("Invalid signatures: %v", err)
+	}
+	serializedTx, err := tx.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize transaction: %w", err)
+	}
+	encodedTx := base64.StdEncoding.EncodeToString(serializedTx)
+
+	binaryTx, err := base64.StdEncoding.DecodeString(encodedTx)
+	if err != nil {
+		return nil, fmt.Errorf("Base64 decode error: %w", err)
+	}
+
+	base58Tx := base58.Encode(binaryTx)
 	return &account.SignedTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
 		Msg:      "create un sign tx success",
-		SignedTx: tx.String(),
+		SignedTx: base58Tx,
 	}, nil
 }
 
@@ -564,8 +681,31 @@ func (c *ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) 
 }
 
 func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
-	//TODO implement me
-	panic("implement me")
+
+	txBytes, err := base58.Decode(req.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode transaction: %w", err)
+	}
+
+	tx, err := solana.TransactionFromBytes(txBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize transaction: %w", err)
+	}
+
+	if err := tx.VerifySignatures(); err != nil {
+		log.Info("Invalid signatures", "err", err)
+		return &account.VerifyTransactionResponse{
+			Code:   common2.ReturnCode_ERROR,
+			Msg:    "invalid signature",
+			Verify: false,
+		}, nil
+	}
+
+	return &account.VerifyTransactionResponse{
+		Code:   common2.ReturnCode_SUCCESS,
+		Msg:    "valid signature",
+		Verify: true,
+	}, nil
 }
 
 func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
@@ -573,9 +713,22 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 	panic("implement me")
 }
 func isSOLTransfer(coinAddress string) bool {
-	// SOL 的 wrapped token address 或空字符串
+
 	return coinAddress == "" ||
 		coinAddress == "So11111111111111111111111111111111111111112"
+}
+func getPrivateKey(keyStr string) (solana.PrivateKey, error) {
+	// base58
+	if prikey, err := solana.PrivateKeyFromBase58(keyStr); err == nil {
+		return prikey, nil
+	}
+
+	// 16
+	if bytes, err := hex.DecodeString(keyStr); err == nil {
+		return solana.PrivateKey(bytes), nil
+	}
+
+	return nil, fmt.Errorf("invalid private key format")
 }
 
 func validateChainAndNetwork(chain, network string) (bool, string) {
