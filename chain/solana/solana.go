@@ -339,7 +339,7 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token info: %w", err)
 		}
-		decimals := tokenInfo.Decimals // 获取实际精度
+		decimals := tokenInfo.Decimals 
 
 		valueFloat, err := strconv.ParseFloat(data.Value, 64)
 		if err != nil {
@@ -355,17 +355,16 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 			[]solana.PublicKey{},
 		).Build()
 
-		// 检查接收方是否需要创建 ATA
+
 		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
 		if err != nil || accountInfo.Data == nil {
-			// 需要创建 ATA
+
 			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
-				fromPubkey, // 支付创建费用的账户
-				toPubkey,   // 新 ATA 的所有者
-				mintPubkey, // 代币的 mint address
+				fromPubkey, 
+				toPubkey,   
+				mintPubkey, 
 			).Build()
 
-			// 创建交易（包含创建 ATA 和转账两个指令）
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{createATAInstruction, transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
@@ -470,7 +469,7 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token info: %w", err)
 		}
-		decimals := tokenInfo.Decimals // 获取实际精度
+		decimals := tokenInfo.Decimals
 
 		valueFloat, err := strconv.ParseFloat(data.Value, 64)
 		if err != nil {
@@ -489,21 +488,21 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 		// 检查接收方是否需要创建 ATA
 		accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
 		if err != nil || accountInfo.Data == nil {
-			// 需要创建 ATA
+			
 			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
-				fromPubkey, // 支付创建费用的账户
-				toPubkey,   // 新 ATA 的所有者
-				mintPubkey, // 代币的 mint address
+				fromPubkey, 
+				toPubkey,  
+				mintPubkey, 
 			).Build()
 
-			// 创建交易（包含创建 ATA 和转账两个指令）
+			
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{createATAInstruction, transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
 				solana.TransactionPayer(fromPubkey),
 			)
 		} else {
-			// 直接创建转账交易
+			
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
