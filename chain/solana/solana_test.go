@@ -78,23 +78,22 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 	fmt.Println(resp.SignedTx)
 }
 func createTestBase64Tx() string {
-	// 创建测试数据结构
+
 	testTx := TxStructure{
-		Nonce:           "hsuXVct3kUjH1uxj1Wi8z93TkLTJo7YrHV5hzV61gYe",
-		FromAddress:     "4wHd9tf4x4FkQ3JtgsMKyiEofEHSaZH5rYzfFKLvtESD",
-		ToAddress:       "AaWEWZJZq2M4AUytd9XQGUTUXSpD85qERzbVEfXRjF7B",
-		Value:           "0.01",
-		FromPrivateKey:  "55a70321542da0b6123f37180e61993d5769f0a5d727f9c817151c1270c290963a7b3874ba467be6b81ea361e3d7453af8b81c88aedd24b5031fdda0bc71ad32",
-		ContractAddress: "So11111111111111111111111111111111111111112",
+		Nonce:          "5k4cL62LqAaBU1hYh6nEhnQ5EonPPSxenLDxTn2VtMik",
+		FromAddress:    "7YcpSkLK7gnSJ4JpysHR9BQgwe2gfffRQmMxHDbNf5ve",
+		ToAddress:      "EUVrmoaKaSsHNkMFw7mVARR522wwH41BFRMha3WC8gha",
+		Value:          "0.01",
+		FromPrivateKey: "5XH7UVWU3q7qUwCga2sH55Gtfg1osdBmiRjGxCU3iECBEXqtvxSQcUjNGdpjWrLgS3dago1WGb15KuruTXMjJoR8",
+		//ContractAddress: "So11111111111111111111111111111111111111112",//5VzPuctbhMdqZBpxgxHCyH41sSckqPEKZ7qxbdgMN29Fbvmnpy3x6GcmUFxFw98oy3LcEEVCxwdr4gyQwcboSW6C
+		ContractAddress: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 	}
 
-	// 转换为 JSON
 	jsonBytes, err := json.Marshal(testTx)
 	if err != nil {
 		panic(err)
 	}
 
-	// 转换为 base64
 	base64Str := base64.StdEncoding.EncodeToString(jsonBytes)
 	return base64Str
 }
