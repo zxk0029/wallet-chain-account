@@ -1,14 +1,32 @@
 package solana
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/dapplink-labs/wallet-chain-account/chain"
+	"github.com/dapplink-labs/wallet-chain-account/config"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
+
+func setup() (chain.IChainAdaptor, error) {
+	conf, err := config.New("../../config.yml")
+	if err != nil {
+		log.Error("load config failed, error:", err)
+		return nil, err
+	}
+	adaptor, err := NewChainAdaptor(conf)
+	if err != nil {
+		log.Error("create chain adaptor failed, error:", err)
+		return nil, err
+	}
+	return adaptor, nil
+}
 
 func Test_GetSupportChains(t *testing.T) {
 	adaptor := ChainAdaptor{}
@@ -249,9 +267,10 @@ func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
 		return
 	}
 
-	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+	assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
 	fmt.Println(resp.SignedTx)
 }
+
 func TestChainAdaptor_VerifySignedTransaction(t *testing.T) {
 	adaptor, err := setup()
 	if err != nil {
@@ -268,7 +287,7 @@ func TestChainAdaptor_VerifySignedTransaction(t *testing.T) {
 		return
 	}
 
-	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+	assert.Equal(t, common2.ReturnCode_SUCCESS, resp.Code)
 }
 func createTestBase64Tx() string {
 
