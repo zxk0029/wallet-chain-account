@@ -1,34 +1,64 @@
 package solana
 
+import "github.com/gagliardetto/solana-go"
+
 type RPCError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+type GetHealthResponse struct {
+	Jsonrpc string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Result  string    `json:"result"`
+	Error   *RPCError `json:"error,omitempty"`
+}
+
+type CreateNonceAccountRequest struct {
+	// payer privateKey
+	Payer solana.PrivateKey
+	// nonce account Auth, PublicKey
+	Authority solana.PublicKey
+}
+
+type CreateNonceAccountResponse struct {
+	// nonce account PublicKey
+	NonceAccount solana.PublicKey
+	// nonce
+	Nonce string
+	// nonce
+	Signature string
+}
+
 type GetAccountInfoResponse struct {
-	JsonRPC string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	Result  struct {
 		Context struct {
 			// now slot
 			Slot uint64 `json:"slot"`
 		} `json:"context"`
-		Value struct {
-			// account now balance
-			Lamports uint64 `json:"lamports"`
-			Owner    string `json:"owner"`
-			// slice index = 0, data
-			// slice index = 1, encode = base58, and other
-			Data       []string `json:"data"`
-			Executable bool     `json:"executable"`
-			RentEpoch  uint64   `json:"rentEpoch"`
-		} `json:"value"`
+		Value AccountInfo `json:"value"`
 	} `json:"result"`
 }
 
+type AccountInfo struct {
+	// account now balance
+	Lamports uint64 `json:"lamports"`
+	Owner    string `json:"owner"`
+	// slice index = 0, data
+	// slice index = 1, encode = base58, and other
+	Data       []string `json:"data"`
+	Executable bool     `json:"executable"`
+	RentEpoch  uint64   `json:"rentEpoch"`
+	Space      uint64   `json:"space"`
+}
+
 type GetBalanceResponse struct {
-	JsonRPC string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	Result  struct {
 		Context struct {
 			Slot uint64 `json:"slot"`
@@ -38,8 +68,9 @@ type GetBalanceResponse struct {
 }
 
 type BlockHeightResponse struct {
-	JsonRPC string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	// block height
 	Result uint64 `json:"result"`
 }
@@ -50,17 +81,19 @@ type GetSlotRequest struct {
 }
 
 type GetSlotResponse struct {
-	JsonRPC string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	// slot
 	Result uint64 `json:"result"`
 }
 
 // GetBlocksWithLimitResponse represents the response structure
 type GetBlocksWithLimitResponse struct {
-	JsonRPC string   `json:"jsonrpc"`
-	ID      int      `json:"id"`
-	Result  []uint64 `json:"result"`
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
+	Result  []uint64  `json:"result"`
 }
 
 type GetBlockRequest struct {
@@ -128,15 +161,18 @@ type Status struct {
 //}
 
 type GetTransactionResponse struct {
-	Jsonrpc string    `json:"jsonrpc"`
-	ID      int       `json:"id"`
-	Error   *RPCError `json:"error,omitempty"`
-	Result  struct {
-		Slot        uint64          `json:"slot"`
-		BlockTime   *int64          `json:"blockTime"`
-		Transaction Transaction     `json:"transaction"`
-		Meta        TransactionMeta `json:"meta"`
-	} `json:"result"`
+	Jsonrpc string            `json:"jsonrpc"`
+	ID      int               `json:"id"`
+	Error   *RPCError         `json:"error,omitempty"`
+	Result  TransactionResult `json:"result"`
+}
+
+type TransactionResult struct {
+	Slot        uint64          `json:"slot"`
+	Version     any             `json:"version"`
+	BlockTime   *int64          `json:"blockTime"`
+	Transaction Transaction     `json:"transaction"`
+	Meta        TransactionMeta `json:"meta"`
 }
 
 type Transaction struct {
@@ -162,10 +198,11 @@ type TransactionMeta struct {
 }
 
 type TransactionMessage struct {
-	AccountKeys     []string          `json:"accountKeys"`
-	Header          TransactionHeader `json:"header"`
-	Instructions    []Instruction     `json:"instructions"`
-	RecentBlockhash string            `json:"recentBlockhash"`
+	AccountKeys         []string          `json:"accountKeys"`
+	AddressTableLookups []interface{}     `json:"addressTableLookups"`
+	Header              TransactionHeader `json:"header"`
+	Instructions        []Instruction     `json:"instructions"`
+	RecentBlockhash     string            `json:"recentBlockhash"`
 }
 
 type TransactionHeader struct {
@@ -175,9 +212,10 @@ type TransactionHeader struct {
 }
 
 type Instruction struct {
-	Accounts       []int  `json:"accounts"`
-	Data           string `json:"data"`
-	ProgramIdIndex int    `json:"programIdIndex"`
+	Accounts       []int       `json:"accounts"`
+	Data           string      `json:"data"`
+	ProgramIdIndex int         `json:"programIdIndex"`
+	StackHeight    interface{} `json:"stackHeight"`
 }
 
 type GetFeeForMessageRequest struct {
@@ -186,8 +224,9 @@ type GetFeeForMessageRequest struct {
 }
 
 type GetFeeForMessageResponse struct {
-	Jsonrpc string `json:"jsonrpc"`
-	ID      int    `json:"id"`
+	Jsonrpc string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
 	Result  struct {
 		Context struct {
 			Slot uint64 `json:"slot"`
@@ -199,6 +238,7 @@ type GetFeeForMessageResponse struct {
 type getRecentPrioritizationFeesResponse struct {
 	Jsonrpc string              `json:"jsonrpc"`
 	ID      int                 `json:"id"`
+	Error   *RPCError           `json:"error,omitempty"`
 	Result  []PrioritizationFee `json:"result"`
 }
 
@@ -218,6 +258,7 @@ type GetSignaturesRequest struct {
 type GetSignaturesResponse struct {
 	Jsonrpc string          `json:"jsonrpc"`
 	ID      int             `json:"id"`
+	Error   *RPCError       `json:"error,omitempty"`
 	Result  []SignatureInfo `json:"result"`
 }
 
@@ -230,19 +271,12 @@ type SignatureInfo struct {
 	ConfirmationStatus *string     `json:"confirmationStatus"`
 }
 
-type SendTransactionRequest struct {
-	Encoding            string `json:"encoding,omitempty"`
-	Commitment          string `json:"commitment,omitempty"`
-	SkipPreflight       bool   `json:"skipPreflight,omitempty"`
-	PreflightCommitment string `json:"preflightCommitment,omitempty"`
-	MaxRetries          uint64 `json:"maxRetries,omitempty"`
-	MinContextSlot      uint64 `json:"minContextSlot,omitempty"`
-}
-
 type SimulateRequest struct {
+	Commitment             string        `json:"commitment,omitempty"`
 	SigVerify              bool          `json:"sigVerify,omitempty"`
 	ReplaceRecentBlockhash bool          `json:"replaceRecentBlockhash,omitempty"`
-	InnerInstructions      bool          `json:"innerInstructions,omitempty"`
+	MinContextSlot         uint64        `json:"minContextSlot,omitempty"`
+	Encoding               string        `json:"encoding,omitempty"`
 	Accounts               *AccountsInfo `json:"accounts,omitempty"`
 }
 
@@ -252,37 +286,51 @@ type AccountsInfo struct {
 }
 
 type SimulateTransactionResponse struct {
-	Jsonrpc string `json:"jsonrpc"`
-	ID      int    `json:"id"`
-	Result  struct {
-		Context struct {
-			Slot uint64 `json:"slot"`
-		} `json:"context"`
-		Value struct {
-			Err           interface{} `json:"err"`
-			Logs          []string    `json:"logs"`
-			UnitsConsumed uint64      `json:"unitsConsumed"`
-			Accounts      []struct {
-				Executable bool     `json:"executable"`
-				Lamports   uint64   `json:"lamports"`
-				Owner      string   `json:"owner"`
-				RentEpoch  uint64   `json:"rentEpoch"`
-				Data       []string `json:"data"`
-			} `json:"accounts,omitempty"`
-			ReturnData *struct {
-				ProgramId string   `json:"programId"`
-				Data      []string `json:"data"`
-			} `json:"returnData,omitempty"`
-			InnerInstructions []struct {
-				Index        uint16 `json:"index"`
-				Instructions []struct {
-					ProgramIdIndex uint8   `json:"programIdIndex"`
-					Accounts       []uint8 `json:"accounts"`
-					Data           string  `json:"data"`
-				} `json:"instructions"`
-			} `json:"innerInstructions,omitempty"`
-		} `json:"value"`
-	} `json:"result"`
+	Jsonrpc string         `json:"jsonrpc"`
+	ID      int            `json:"id"`
+	Error   *RPCError      `json:"error,omitempty"`
+	Result  SimulateResult `json:"result"`
+}
+
+type SimulateResult struct {
+	Err           interface{} `json:"err"`
+	Logs          []string    `json:"logs"`
+	UnitsConsumed uint64      `json:"unitsConsumed"`
+	Accounts      []struct {
+		Executable bool     `json:"executable"`
+		Lamports   uint64   `json:"lamports"`
+		Owner      string   `json:"owner"`
+		RentEpoch  uint64   `json:"rentEpoch"`
+		Data       []string `json:"data"`
+	} `json:"accounts,omitempty"`
+	ReturnData *struct {
+		ProgramId string   `json:"programId"`
+		Data      []string `json:"data"`
+	} `json:"returnData,omitempty"`
+	InnerInstructions []struct {
+		Index        uint16 `json:"index"`
+		Instructions []struct {
+			ProgramIdIndex uint8   `json:"programIdIndex"`
+			Accounts       []uint8 `json:"accounts"`
+			Data           string  `json:"data"`
+		} `json:"instructions"`
+	} `json:"innerInstructions,omitempty"`
+}
+
+type SendTransactionRequest struct {
+	Encoding            string `json:"encoding,omitempty"`
+	Commitment          string `json:"commitment,omitempty"`
+	SkipPreflight       bool   `json:"skipPreflight,omitempty"`
+	PreflightCommitment string `json:"preflightCommitment,omitempty"`
+	MaxRetries          uint64 `json:"maxRetries,omitempty"`
+	MinContextSlot      uint64 `json:"minContextSlot,omitempty"`
+}
+
+type SendTransactionResponse struct {
+	Jsonrpc string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Result  string    `json:"result"`
+	Error   *RPCError `json:"error,omitempty"`
 }
 
 type TxStructure struct {
@@ -297,4 +345,19 @@ type TxStructure struct {
 	TokenId         string `json:"token_id"`
 	Value           string `json:"value"`
 	FromPrivateKey  string `json:"from_privatekey"`
+}
+
+type GetLatestBlockhashResponse struct {
+	JsonRPC string    `json:"jsonrpc"`
+	ID      int       `json:"id"`
+	Error   *RPCError `json:"error,omitempty"`
+	Result  struct {
+		Context struct {
+			Slot uint64 `json:"slot"`
+		} `json:"context"`
+		Value struct {
+			Blockhash            string `json:"blockhash"`
+			LastValidBlockHeight uint64 `json:"lastValidBlockHeight"`
+		} `json:"value"`
+	} `json:"result"`
 }

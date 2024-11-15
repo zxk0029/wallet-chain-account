@@ -25,6 +25,10 @@ import (
 
 const ChainName = "Solana"
 
+const (
+	MaxBlockRange = 1000
+)
+
 type ChainAdaptor struct {
 	solCli    SolClient
 	sdkClient *rpc.Client
@@ -278,47 +282,96 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 }
 
 func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
-	//req.ContractAddress as nonceAddress
-	//nonceResult, err := c.solCli.GetNonce(req.ContractAddress)
-	//if err != nil {
-	//	log.Error("get nonce by address fail", "err", err)
-	//	return &account.AccountResponse{
-	//		Code: common2.ReturnCode_ERROR,
-	//		Msg:  "get nonce by address fail",
-	//	}, nil
-	//}
-	balanceResult, err := c.solCli.GetBalance(req.Address)
-	if err != nil {
-		return &account.AccountResponse{
-			Code:    common2.ReturnCode_ERROR,
-			Msg:     "get token balance fail",
-			Balance: "0",
-		}, err
+	response := &account.AccountResponse{
+		Code:          common2.ReturnCode_ERROR,
+		Msg:           "",
+		Network:       "",
+		AccountNumber: "",
+		Sequence:      "",
+		Balance:       "",
 	}
-	log.Info("balance result", "balance=", balanceResult, "balanceStr=", balanceResult)
-	return &account.AccountResponse{
-		Code:          common2.ReturnCode_SUCCESS,
-		Msg:           "get account response success",
-		AccountNumber: "0",
-		//Sequence:      nonceResult,
-		//Balance:       balanceResult,
-	}, nil
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		response.Msg = msg
+		err := fmt.Errorf("GetAccount validateChainAndNetwork fail, err msg = %s", msg)
+		return response, err
+	}
+	accountInfoResp, err := c.solCli.GetAccountInfo(req.Address)
+	if err != nil {
+		err := fmt.Errorf("GetAccount GetAccountInfo failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	latestBlockhashResponse, err := c.solCli.GetLatestBlockhash(Finalized)
+	if err != nil {
+		err := fmt.Errorf("GetAccount GetLatestBlockhash failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "GetAccount success"
+	response.Sequence = latestBlockhashResponse
+	response.Network = req.Network
+	response.Balance = strconv.FormatUint(accountInfoResp.Lamports, 10)
+	return response, nil
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	response := &account.FeeResponse{
+		Code:      common2.ReturnCode_ERROR,
+		Msg:       "",
+		SlowFee:   "",
+		NormalFee: "",
+		FastFee:   "",
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		response.Msg = msg
+		err := fmt.Errorf("GetFee validateChainAndNetwork fail, err msg = %s", msg)
+		return response, err
+	}
+	baseFee, err := c.solCli.GetFeeForMessage(req.RawTx)
+	if err != nil {
+		err := fmt.Errorf("GetFee GetFeeForMessage failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	priorityFees, err := c.solCli.GetRecentPrioritizationFees()
+	if err != nil {
+		err := fmt.Errorf("GetFee GetRecentPrioritizationFees failed: %w", err)
+		log.Error("err", err)
+		response.Msg = err.Error()
+		return nil, err
+	}
+	priorityFee := GetSuggestedPriorityFee(priorityFees)
+	slowFee := baseFee + uint64(float64(priorityFee)*0.75)
+	normalFee := baseFee + priorityFee
+	fastFee := baseFee + uint64(float64(priorityFee)*1.25)
+
+	response.SlowFee = strconv.FormatUint(slowFee, 10)
+	response.NormalFee = strconv.FormatUint(normalFee, 10)
+	response.FastFee = strconv.FormatUint(fastFee, 10)
+
+	return response, nil
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	//TxResponse, err := c.solCli.SendTx(req.RawTx)
-	//if err != nil {
-	//	return &account.SendTxResponse{
-	//		Code:   common2.ReturnCode_ERROR,
-	//		Msg:    "get tx response error",
-	//		TxHash: "0",
-	//	}, nil
+	if req.RawTx == "" {
+		return &account.SendTxResponse{
+			Code:   common2.ReturnCode_ERROR,
+			Msg:    "invalid input: empty transaction",
+			TxHash: "",
+		}, nil
+	}
+	//simConfig := &SimulateRequest{
+	//	SigVerify:              true,
+	//	Commitment:             "confirmed",
+	//	ReplaceRecentBlockhash: false,
+	//	MinContextSlot:         0,
 	//}
+
 	return &account.SendTxResponse{
 		Code: common2.ReturnCode_SUCCESS,
 		Msg:  "get tx response success",
@@ -369,37 +422,203 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 }
 
 func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashResponse, error) {
-	//tx, err := c.solCli.GetTxByHash(req.Hash)
-	//if err != nil {
-	//	return &account.TxHashResponse{
-	//		Code: common2.ReturnCode_ERROR,
-	//		Msg:  err.Error(),
-	//		Tx:   nil,
-	//	}, err
-	//}
-	//var value_list []*account.Value
-	//value_list = append(value_list, &account.Value{Value: tx.Value})
-	return &account.TxHashResponse{
-		Tx: &account.TxMessage{
-			//Hash:  tx.Hash,
-			//Tos:   []*account.Address{{Address: tx.To}},
-			//Froms: []*account.Address{{Address: tx.From}},
+	response := &account.TxHashResponse{
+		Code: common2.ReturnCode_ERROR,
+		Msg:  "",
+		Tx:   nil,
+	}
 
-			//Fee:    tx.Fee,
-			//Status: account.TxStatus_Success,
-			//Values: value_list,
-			//Type:   tx.Type,
-			//Height: tx.Height,
-		},
-	}, nil
+	if err := validateRequest(req); err != nil {
+		response.Msg = err.Error()
+		return response, err
+	}
+
+	txResult, err := c.solCli.GetTransaction(req.Hash)
+	if err != nil {
+		response.Msg = err.Error()
+		log.Error("GetTransaction failed", "error", err)
+		return response, err
+	}
+
+	tx, err := buildTxMessage(txResult)
+	if err != nil {
+		response.Msg = err.Error()
+		return response, err
+	}
+
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "success"
+	response.Tx = tx
+
+	return response, nil
+}
+
+func validateRequest(req *account.TxHashRequest) error {
+	if req == nil {
+		return fmt.Errorf("invalid request: request is nil")
+	}
+	if req.Hash == "" {
+		return fmt.Errorf("invalid request: empty transaction hash")
+	}
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		return fmt.Errorf("invalid chain or network: %s", msg)
+	}
+	return nil
+}
+
+func buildTxMessage(txResult *TransactionResult) (*account.TxMessage, error) {
+	if txResult == nil {
+		return nil, fmt.Errorf("empty transaction result")
+	}
+
+	if len(txResult.Transaction.Signatures) == 0 {
+		return nil, fmt.Errorf("invalid transaction: no signatures")
+	}
+	if len(txResult.Transaction.Message.AccountKeys) == 0 {
+		return nil, fmt.Errorf("invalid transaction: no account keys")
+	}
+
+	tx := &account.TxMessage{
+		Hash:   txResult.Transaction.Signatures[0],
+		Height: strconv.FormatUint(txResult.Slot, 10),
+		Fee:    strconv.FormatUint(txResult.Meta.Fee, 10),
+	}
+
+	if txResult.Meta.Err != nil {
+		tx.Status = account.TxStatus_Failed
+	} else {
+		tx.Status = account.TxStatus_Success
+	}
+
+	if txResult.BlockTime != nil {
+		tx.Datetime = time.Unix(*txResult.BlockTime, 0).Format(time.RFC3339)
+	}
+
+	tx.Froms = []*account.Address{{
+		Address: txResult.Transaction.Message.AccountKeys[0],
+	}}
+
+	tx.Tos = make([]*account.Address, 0)
+	tx.Values = make([]*account.Value, 0)
+
+	if err := processInstructions(txResult, tx); err != nil {
+		return nil, fmt.Errorf("failed to process instructions: %w", err)
+	}
+
+	return tx, nil
+}
+
+func processInstructions(txResult *TransactionResult, tx *account.TxMessage) error {
+	for i, inst := range txResult.Transaction.Message.Instructions {
+		if inst.ProgramIdIndex >= len(txResult.Transaction.Message.AccountKeys) {
+			log.Warn("Invalid program ID index", "instruction", i)
+			continue
+		}
+
+		if txResult.Transaction.Message.AccountKeys[inst.ProgramIdIndex] != "11111111111111111111111111111111" {
+			continue
+		}
+
+		if len(inst.Accounts) < 2 {
+			log.Warn("Invalid accounts length", "instruction", i)
+			continue
+		}
+
+		toIndex := inst.Accounts[1]
+		if toIndex >= len(txResult.Transaction.Message.AccountKeys) {
+			log.Warn("Invalid to account index", "instruction", i)
+			continue
+		}
+
+		toAddr := txResult.Transaction.Message.AccountKeys[toIndex]
+		tx.Tos = append(tx.Tos, &account.Address{Address: toAddr})
+
+		if err := calculateAmount(txResult, toIndex, tx); err != nil {
+			log.Warn("Failed to calculate amount", "error", err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func calculateAmount(txResult *TransactionResult, toIndex int, tx *account.TxMessage) error {
+	if toIndex >= len(txResult.Meta.PostBalances) || toIndex >= len(txResult.Meta.PreBalances) {
+		return fmt.Errorf("invalid balance index: %d", toIndex)
+	}
+
+	amount := txResult.Meta.PostBalances[toIndex] - txResult.Meta.PreBalances[toIndex]
+	tx.Values = append(tx.Values, &account.Value{
+		Value: strconv.FormatUint(amount, 10),
+	})
+
+	return nil
 }
 
 func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+	response := &account.BlockByRangeResponse{
+		Code:        common2.ReturnCode_ERROR,
+		Msg:         "",
+		BlockHeader: nil,
+	}
+	if err := validateBlockRangeRequest(req); err != nil {
+		response.Msg = err.Error()
+		return response, err
+	}
+	startSlot := req.Start
+	endSlot := req.End
+	signatures, err := c.solCli.getSignaturesInRange(startSlot, endSlot)
+	if err != nil {
+		response.Msg = fmt.Sprintf("failed to get signatures: %v", err)
+		return response, err
+	}
+	txResults, err := c.solCli.GetTransactionRange(signatures)
+	if err != nil {
+		response.Msg = fmt.Sprintf("failed to get transactions: %v", err)
+		return response, err
+	}
+	blocks, err := organizeTransactionsByBlock(txResults)
+	if err != nil {
+		response.Msg = fmt.Sprintf("failed to organize transactions: %v", err)
+		return response, err
+	}
 
+	response.Code = common2.ReturnCode_SUCCESS
+	response.Msg = "success"
+	response.Blocks = blocks
+
+	return response, nil
+}
+
+func validateBlockRangeRequest(req *account.BlockByRangeRequest) error {
+	if req == nil {
+		return fmt.Errorf("invalid request: request is nil")
+	}
+	startSlot, err := strconv.ParseUint(req.Start, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid start height format: %s", err)
+	}
+	endSlot, err := strconv.ParseUint(req.End, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid end height format: %s", err)
+	}
+
+	if startSlot > endSlot {
+		return fmt.Errorf("invalid height range: start height greater than end height")
+	}
+
+	if startSlot-endSlot > MaxBlockRange {
+		return fmt.Errorf("invalid range: exceeds maximum allowed range of %d", MaxBlockRange)
+	}
+
+	if ok, msg := validateChainAndNetwork(req.Chain, req.Network); !ok {
+		return fmt.Errorf("invalid chain or network: %s", msg)
+	}
+
+	return nil
+}
+
+func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
 	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
 	if err != nil {
 		log.Error("decode string fail", "err", err)

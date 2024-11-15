@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/programs/system"
-	"github.com/gagliardetto/solana-go/rpc"
 	"log"
 	"sort"
 	"strings"
@@ -19,10 +16,17 @@ import (
 type SolClient interface {
 	GetHealth() (string, error)
 
-	GetAccountInfo(inputAddr string) (*GetAccountInfoResponse, error)
-	GetBalance(inputAddr string) (*GetBalanceResponse, error)
-
-	//GetBlockHeight() (uint64, error)
+	GetAccountInfo(inputAddr string) (*AccountInfo, error)
+	GetBalance(inputAddr string) (uint64, error)
+	GetLatestBlockhash(commitmentType CommitmentType) (string, error)
+	SendTransaction(
+		signedTx string,
+		config *SendTransactionRequest,
+	) (string, error)
+	SimulateTransaction(
+		signedTx string,
+		config *SimulateRequest,
+	) (*SimulateResult, error)
 
 	GetFeeForMessage(message string) (uint64, error)
 	GetRecentPrioritizationFees() ([]PrioritizationFee, error)
@@ -31,8 +35,8 @@ type SolClient interface {
 	GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64, error)
 	GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*BlockResult, error)
 
-	GetTransaction(signature string) (*GetTransactionResponse, error)
-	GetTransactionRange(signatures []string) ([]*GetTransactionResponse, error)
+	GetTransaction(signature string) (*TransactionResult, error)
+	GetTransactionRange(signatures []string) ([]*TransactionResult, error)
 	GetTxForAddress(
 		address string,
 		commitment CommitmentType,
@@ -61,6 +65,12 @@ const (
 	Accounts   TransactionDetailsType = "accounts"
 	Signatures TransactionDetailsType = "signatures"
 	None       TransactionDetailsType = "none"
+)
+
+const (
+	HealthOk      = "ok"
+	HealthBehind  = "behind"
+	HealthUnknown = "unknown"
 )
 
 const (
@@ -139,19 +149,10 @@ func (s *solclient) GetHealth() (string, error) {
 		"params":  []interface{}{},
 	}
 
-	resp := struct {
-		Jsonrpc string `json:"jsonrpc"`
-		ID      int    `json:"id"`
-		Result  string `json:"result"`
-		Error   struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error,omitempty"`
-	}{}
-
+	response := &GetHealthResponse{}
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(&resp).
+		SetResult(response).
 		Post("/")
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
@@ -161,16 +162,146 @@ func (s *solclient) GetHealth() (string, error) {
 		return "", fmt.Errorf("failed to get health: %w", errHTTPError)
 	}
 
-	if resp.Error.Message != "" {
-		return "", fmt.Errorf("rpc error: %s (code: %d)",
-			resp.Error.Message, resp.Error.Code)
+	if response.Error != nil {
+		if response.Error.Code == -32005 {
+			return HealthBehind, nil
+		}
+		return HealthUnknown, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
 	}
 
-	return resp.Result, nil
+	if response.Result == "" {
+		return HealthUnknown, fmt.Errorf("invalid response: empty result")
+	}
+
+	switch response.Result {
+	case HealthOk, HealthBehind:
+		return response.Result, nil
+	default:
+		return HealthUnknown, fmt.Errorf("unknown health status: %s", response.Result)
+	}
 }
 
-func (s *solclient) GetAccountInfo(inputAddr string) (*GetAccountInfoResponse, error) {
+func (s *solclient) CreateNonceAccount(req *CreateNonceAccountRequest) (*CreateNonceAccountResponse, error) {
+	// 1. 生成新的 nonce account 密钥对
+	//nonceAccount := solana.NewWallet().PrivateKey
+
+	// 2. 获取最新的 blockhash
+	//blockhash, err := s.GetLatestBlockhash()
+	//if err != nil {
+	//	return nil, fmt.Errorf("get blockhash failed: %w", err)
+	//}
+
+	// 3. 获取最小租金
+	//rentRequest := map[string]interface{}{
+	//	"jsonrpc": "2.0",
+	//	"id":      1,
+	//	"method":  "getMinimumBalanceForRentExemption",
+	//	"params": []interface{}{
+	//		system.NonceAccountSize,
+	//	},
+	//}
+	//
+	//var rentResponse struct {
+	//	Result uint64 `json:"result"`
+	//}
+	//
+	//resp, err := s.grestyClient.R().
+	//	SetBody(rentRequest).
+	//	SetResult(&rentResponse).
+	//	Post("/")
+	//if err != nil {
+	//	return nil, fmt.Errorf("get rent failed: %w", err)
+	//}
+
+	//rent := rentResponse.Result
+
+	// 4. 构建创建 nonce account 的指令
+	//createNonceAccIx := system.NewCreateNonceAccountInstruction(
+	//	rent,
+	//	system.NonceAccountSize,
+	//	req.Payer.PublicKey(),
+	//	nonceAccount.PublicKey(),
+	//	req.Authority,
+	//).Build()
+
+	// 5. 构建交易
+	//tx, err := solana.NewTransaction(
+	//	[]solana.Instruction{
+	//		createNonceAccIx,
+	//	},
+	//	blockhash.Result.Value.Blockhash,
+	//	solana.TransactionPayer(req.Payer.PublicKey()),
+	//)
+
+	// 6. 签名交易
+	//_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+	//	if key.Equals(req.Payer.PublicKey()) {
+	//		return &req.Payer
+	//	}
+	//	if key.Equals(nonceAccount.PublicKey()) {
+	//		return &nonceAccount
+	//	}
+	//	return nil
+	//})
+	//if err != nil {
+	//	return nil, fmt.Errorf("sign transaction failed: %w", err)
+	//}
+
+	// 7. 发送交易
+	//txHash, err := tx.Hash()
+	//if err != nil {
+	//	return nil, fmt.Errorf("get transaction hash failed: %w", err)
+	//}
+	//
+	//sendRequest := map[string]interface{}{
+	//	"jsonrpc": "2.0",
+	//	"id":      1,
+	//	"method":  "sendTransaction",
+	//	"params": []interface{}{
+	//		tx.MarshalBase64(),
+	//		map[string]interface{}{
+	//			"encoding": "base64",
+	//		},
+	//	},
+	//}
+	//
+	//var sendResponse struct {
+	//	Result string `json:"result"`
+	//}
+	//
+	//resp, err = s.grestyClient.R().
+	//	SetBody(sendRequest).
+	//	SetResult(&sendResponse).
+	//	Post("/")
+	//if err != nil {
+	//	return nil, fmt.Errorf("send transaction failed: %w", err)
+	//}
+	//
+	//// 8. 等待交易确认
+	//time.Sleep(time.Second * 2)
+
+	// 9. 获取 nonce 值
+	//nonceInfo, err := s.GetNonceAccount(nonceAccount.PublicKey().String())
+	//if err != nil {
+	//	return nil, fmt.Errorf("get nonce failed: %w", err)
+	//}
+
+	//return &CreateNonceAccountResponse{
+	//	NonceAccount: nonceAccount.PublicKey(),
+	//	//Nonce:        nonceInfo.Nonce.String(),
+	//	Signature: sendResponse.Result,
+	//}, nil
+	return nil, nil
+}
+
+func (s *solclient) GetAccountInfo(inputAddr string) (*AccountInfo, error) {
 	dealAddr := strings.TrimSpace(inputAddr)
+	if dealAddr == "" {
+		return nil, fmt.Errorf("invalid input: empty address")
+	}
 
 	requestBody := map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -183,10 +314,10 @@ func (s *solclient) GetAccountInfo(inputAddr string) (*GetAccountInfoResponse, e
 			},
 		},
 	}
-	account := &GetAccountInfoResponse{}
+	response := &GetAccountInfoResponse{}
 	resp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(account).
+		SetResult(response).
 		Post("/")
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -195,11 +326,33 @@ func (s *solclient) GetAccountInfo(inputAddr string) (*GetAccountInfoResponse, e
 	if resp.IsError() {
 		return nil, fmt.Errorf("failed to get account info: %w", errHTTPError)
 	}
-	return account, nil
+
+	if response.Error != nil {
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+
+	accountInfo := &response.Result.Value
+	if accountInfo.Owner == "" {
+		return nil, fmt.Errorf("invalid response: empty owner")
+	}
+	if len(accountInfo.Data) < 2 {
+		return nil, fmt.Errorf("invalid response: missing data encoding")
+	}
+	if accountInfo.Data[1] != "base64" {
+		return nil, fmt.Errorf("unexpected data encoding: %s", accountInfo.Data[1])
+	}
+
+	return accountInfo, nil
 }
 
-func (s *solclient) GetBalance(inputAddr string) (*GetBalanceResponse, error) {
+func (s *solclient) GetBalance(inputAddr string) (uint64, error) {
 	dealAddr := strings.TrimSpace(inputAddr)
+	if dealAddr == "" {
+		return 0, fmt.Errorf("invalid input: empty address")
+	}
 
 	requestBody := map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -210,19 +363,31 @@ func (s *solclient) GetBalance(inputAddr string) (*GetBalanceResponse, error) {
 		},
 	}
 
-	balance := &GetBalanceResponse{}
+	response := &GetBalanceResponse{}
 	resp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(balance).
+		SetResult(response).
 		Post("/")
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return 0, fmt.Errorf("request failed: %w", err)
 	}
 
 	if resp.IsError() {
-		return nil, fmt.Errorf("failed to get balance: %w", errHTTPError)
+		return 0, fmt.Errorf("HTTP error: status=%d, body=%s",
+			resp.StatusCode(),
+			resp.String(),
+		)
 	}
-	return balance, nil
+	if response.Error != nil {
+		return 0, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+	if response.Result.Value == 0 {
+		log.Printf("Warning: account balance is 0 for address: %s", dealAddr)
+	}
+	return response.Result.Value, nil
 }
 
 // GetBlockHeight get latest height
@@ -233,11 +398,12 @@ func (s *solclient) GetBlockHeight() (uint64, error) {
 		"method":  "getBlockHeight",
 	}
 
-	resp := &BlockHeightResponse{}
+	response := &BlockHeightResponse{}
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(resp).
+		SetResult(response).
 		Post("/")
+
 	if err != nil {
 		return 0, fmt.Errorf("request failed: %w", err)
 	}
@@ -245,13 +411,23 @@ func (s *solclient) GetBlockHeight() (uint64, error) {
 	if httpResp.IsError() {
 		return 0, fmt.Errorf("failed to get block height: %w", errHTTPError)
 	}
-
-	return resp.Result, nil
+	if response.Error != nil {
+		return 0, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+	if response.Result == 0 {
+		return 0, fmt.Errorf("invalid block height: got 0")
+	}
+	return response.Result, nil
 }
 
 // GetSlot get latest slot
 func (s *solclient) GetSlot(commitment CommitmentType) (uint64, error) {
-
+	if commitment == "" {
+		return 0, fmt.Errorf("invalid input: empty commitment")
+	}
 	config := GetSlotRequest{
 		Commitment: commitment,
 	}
@@ -263,11 +439,12 @@ func (s *solclient) GetSlot(commitment CommitmentType) (uint64, error) {
 		"params":  []interface{}{config},
 	}
 
-	resp := &GetSlotResponse{}
+	response := &GetSlotResponse{}
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(resp).
+		SetResult(response).
 		Post("/")
+
 	if err != nil {
 		return 0, fmt.Errorf("request failed: %w", err)
 	}
@@ -276,11 +453,28 @@ func (s *solclient) GetSlot(commitment CommitmentType) (uint64, error) {
 		return 0, fmt.Errorf("failed to get slot: %w", errHTTPError)
 	}
 
-	return resp.Result, nil
+	if response.Error != nil {
+		return 0, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+
+	if response.Result == 0 {
+		return 0, fmt.Errorf("invalid slot number: got 0")
+	}
+
+	return response.Result, nil
 }
 
 // GetBlocksWithLimit returns a list of confirmed blocks starting at the given slot with limit
 func (s *solclient) GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64, error) {
+	if startSlot == 0 {
+		return nil, fmt.Errorf("invalid input: start slot cannot be 0")
+	}
+	if limit == 0 {
+		return nil, fmt.Errorf("invalid input: limit cannot be 0")
+	}
 	if limit > blockLimit {
 		return nil, fmt.Errorf("limit must not exceed %d blocks", blockLimit)
 	}
@@ -292,10 +486,10 @@ func (s *solclient) GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64
 		"params":  []uint64{startSlot, limit},
 	}
 
-	resp := &GetBlocksWithLimitResponse{}
+	response := &GetBlocksWithLimitResponse{}
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(resp).
+		SetResult(response).
 		Post("/")
 
 	if err != nil {
@@ -306,7 +500,28 @@ func (s *solclient) GetBlocksWithLimit(startSlot uint64, limit uint64) ([]uint64
 		return nil, fmt.Errorf("failed to get blocks with limit: %w", errHTTPError)
 	}
 
-	return resp.Result, nil
+	if response.Error != nil {
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+
+	if response.Result == nil {
+		return []uint64{}, nil
+	}
+
+	if len(response.Result) == 0 {
+		log.Printf("Warning: no blocks found for slot range %d to %d",
+			startSlot, startSlot+limit-1)
+	}
+
+	if uint64(len(response.Result)) > limit {
+		return nil, fmt.Errorf("received more blocks than requested limit: got %d, want <= %d",
+			len(response.Result), limit)
+	}
+
+	return response.Result, nil
 }
 
 func (s *solclient) GetBlockBySlot(slot uint64, detailType TransactionDetailsType) (*BlockResult, error) {
@@ -348,7 +563,14 @@ func (s *solclient) GetBlockBySlot(slot uint64, detailType TransactionDetailsTyp
 	return &resp.Result, nil
 }
 
-func (s *solclient) GetTransaction(signature string) (*GetTransactionResponse, error) {
+func (s *solclient) GetTransaction(signature string) (*TransactionResult, error) {
+	signature = strings.TrimSpace(signature)
+	if signature == "" {
+		return nil, fmt.Errorf("invalid input: empty signature")
+	}
+	if len(signature) < 88 || len(signature) > 90 {
+		return nil, fmt.Errorf("invalid signature length: expected 88-90 chars, got %d", len(signature))
+	}
 	config := map[string]interface{}{
 		"encoding":                       "json",
 		"commitment":                     Finalized,
@@ -362,10 +584,10 @@ func (s *solclient) GetTransaction(signature string) (*GetTransactionResponse, e
 		"params":  []interface{}{signature, config},
 	}
 
-	resp := &GetTransactionResponse{}
+	response := &GetTransactionResponse{}
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
-		SetResult(resp).
+		SetResult(response).
 		Post("/")
 
 	if err != nil {
@@ -375,92 +597,144 @@ func (s *solclient) GetTransaction(signature string) (*GetTransactionResponse, e
 	if httpResp.IsError() {
 		return nil, fmt.Errorf("failed to get transaction: %w", errHTTPError)
 	}
-	if resp.Error != nil {
-		return nil, fmt.Errorf("RPC error: (code: %d) %s", resp.Error.Code, resp.Error.Message)
+	if response.Error != nil {
+		if response.Error.Code == -32004 {
+			return nil, fmt.Errorf("transaction not found: %s", signature)
+		}
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+	if response.Result.Transaction.Signatures == nil {
+		return nil, fmt.Errorf("invalid response: empty transaction data")
 	}
 
-	return resp, nil
+	return &TransactionResult{
+		Slot:        response.Result.Slot,
+		Version:     response.Result.Version,
+		BlockTime:   response.Result.BlockTime,
+		Transaction: response.Result.Transaction,
+		Meta:        response.Result.Meta,
+	}, nil
 }
 
-func (s *solclient) GetTransactionRange(signatures []string) ([]*GetTransactionResponse, error) {
-	if len(signatures) == 0 {
+func (s *solclient) GetTransactionRange(inputSignatureList []string) ([]*TransactionResult, error) {
+	if len(inputSignatureList) == 0 {
 		return nil, fmt.Errorf("empty signatures")
 	}
 
-	if len(signatures) == 1 {
-		tx, err := s.GetTransaction(signatures[0])
-		if err != nil {
-			return nil, err
+	for i, sig := range inputSignatureList {
+		inputSignatureList[i] = strings.TrimSpace(sig)
+		if inputSignatureList[i] == "" {
+			return nil, fmt.Errorf("invalid input: empty signature at index %d", i)
 		}
-		return []*GetTransactionResponse{tx}, nil
+		if len(inputSignatureList[i]) < 88 || len(inputSignatureList[i]) > 90 {
+			return nil, fmt.Errorf("invalid signature length at index %d: expected 88-90 chars, got %d",
+				i, len(inputSignatureList[i]))
+		}
 	}
 
-	count := len(signatures)
-	transactions := make([]*GetTransactionResponse, count)
-	var wg sync.WaitGroup
+	if len(inputSignatureList) == 1 {
+		tx, err := s.GetTransaction(inputSignatureList[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to get single transaction: %w", err)
+		}
+		return []*TransactionResult{tx}, nil
+	}
 
-	const groupSize = 20
-	numGroups := (count-1)/groupSize + 1
-	errChan := make(chan error, numGroups)
+	const (
+		maxConcurrent   = 20
+		requestInterval = 100 * time.Millisecond
+		timeout         = 5 * time.Minute
+		maxRetries      = 3
+	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	rateLimiter := time.NewTicker(100 * time.Millisecond)
+	resultChannel := make(chan *TransactionResult, len(inputSignatureList))
+	errorChannel := make(chan error, len(inputSignatureList))
+
+	rateLimiter := time.NewTicker(requestInterval)
 	defer rateLimiter.Stop()
 
-	for i := 0; i < count; i += groupSize {
-		start := i
-		end := i + groupSize - 1
-		if end >= count {
-			end = count - 1
-		}
-		wg.Add(1)
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, maxConcurrent)
 
-		go func(start, end int) {
+	for i, sig := range inputSignatureList {
+		wg.Add(1)
+		go func(index int, signature string) {
 			defer wg.Done()
 
-			for j := start; j <= end; j++ {
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			var tx *TransactionResult
+			var err error
+
+			for retry := 0; retry < maxRetries; retry++ {
 				select {
 				case <-ctx.Done():
-					errChan <- ctx.Err()
+					errorChannel <- ctx.Err()
 					return
 				case <-rateLimiter.C:
-					tx, err := s.GetTransaction(signatures[j])
-					if err != nil {
-						if strings.Contains(err.Error(), "Transaction not found") {
-							transactions[j] = nil
-							continue
-						}
-						errChan <- fmt.Errorf("failed to get transaction %s: %w", signatures[j], err)
+					tx, err = s.GetTransaction(signature)
+					if err == nil {
+						resultChannel <- tx
 						return
 					}
-					transactions[j] = tx
+
+					if retry < maxRetries-1 && strings.Contains(err.Error(), "request failed") {
+						time.Sleep(time.Second * time.Duration(retry+1))
+						continue
+					}
+
+					errorChannel <- fmt.Errorf("failed to get transaction %s: %w", signature, err)
+					return
 				}
 			}
-		}(start, end)
+
+			if err != nil {
+				errorChannel <- fmt.Errorf("max retries exceeded for %s: %w", signature, err)
+			}
+		}(i, sig)
 	}
 
 	wg.Wait()
-	close(errChan)
+	close(resultChannel)
+	close(errorChannel)
 
-	for err := range errChan {
+	var errorList []string
+	for err := range errorChannel {
 		if err != nil {
-			return nil, err
+			errorList = append(errorList, err.Error())
+		}
+	}
+	if len(errorList) > 0 {
+		return nil, fmt.Errorf("multiple errors occurred: %s", strings.Join(errorList, "; "))
+	}
+
+	validResults := make([]*TransactionResult, 0, len(resultChannel))
+	for result := range resultChannel {
+		if result != nil && result.Transaction.Signatures != nil {
+			validResults = append(validResults, result)
+		} else {
+			log.Println("Skipping invalid transaction", "result", result)
 		}
 	}
 
-	validTransactions := make([]*GetTransactionResponse, 0)
-	for _, tx := range transactions {
-		if tx != nil {
-			validTransactions = append(validTransactions, tx)
-		}
+	if len(validResults) == 0 {
+		return nil, fmt.Errorf("no valid transactions found")
 	}
 
-	return validTransactions, nil
+	return validResults, nil
 }
 
 func (s *solclient) GetFeeForMessage(message string) (uint64, error) {
+	if message == "" {
+		return 0, fmt.Errorf("invalid input: empty message")
+	}
 	config := GetFeeForMessageRequest{
 		Commitment: string(Finalized),
 	}
@@ -484,7 +758,12 @@ func (s *solclient) GetFeeForMessage(message string) (uint64, error) {
 	if httpResp.IsError() {
 		return 0, fmt.Errorf("failed to get fee for message: %w", errHTTPError)
 	}
-
+	if resp.Error != nil {
+		return 0, fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
 	if resp.Result.Value == nil {
 		return 0, fmt.Errorf("invalid message or unable to estimate fee")
 	}
@@ -513,6 +792,15 @@ func (s *solclient) GetRecentPrioritizationFees() ([]PrioritizationFee, error) {
 		return nil, fmt.Errorf("failed to get prioritization fees: %w", errHTTPError)
 	}
 
+	if resp.Error != nil {
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
+	if resp.Result == nil {
+		return []PrioritizationFee{}, nil
+	}
 	if len(resp.Result) == 0 {
 		return []PrioritizationFee{}, nil
 	}
@@ -548,6 +836,7 @@ func (s *solclient) GetTxForAddress(
 	if address == "" {
 		return nil, fmt.Errorf("empty address")
 	}
+
 	config := &GetSignaturesRequest{
 		Commitment: string(commitment),
 		Limit:      limit,
@@ -575,13 +864,34 @@ func (s *solclient) GetTxForAddress(
 		return nil, fmt.Errorf("failed to get signatures: %w", errHTTPError)
 	}
 
+	if resp.Error != nil {
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
+
+	if resp.Result == nil {
+		return []SignatureInfo{}, nil
+	}
+
 	return resp.Result, nil
 }
 
 func (s *solclient) SimulateTransaction(
 	signedTx string,
 	config *SimulateRequest,
-) (*SimulateTransactionResponse, error) {
+) (*SimulateResult, error) {
+	if signedTx == "" {
+		return nil, fmt.Errorf("invalid input: empty transaction")
+	}
+	if config == nil {
+		config = &SimulateRequest{
+			Commitment: string(Finalized),
+			Encoding:   "base64",
+		}
+	}
+
 	requestBody := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -605,13 +915,84 @@ func (s *solclient) SimulateTransaction(
 		return nil, fmt.Errorf("failed to simulate transaction: %w", errHTTPError)
 	}
 
-	return resp, nil
+	if resp.Error != nil {
+		return nil, fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
+	if resp.Result.Err != nil {
+		return nil, fmt.Errorf("simulation failed: %v", resp.Result.Err)
+	}
+	if resp.Result.UnitsConsumed == 0 && len(resp.Result.Logs) == 0 {
+		return nil, fmt.Errorf("empty simulation result")
+	}
+	return &resp.Result, nil
+}
+
+func validateSimulateResponse(resp *SimulateTransactionResponse) error {
+	if resp == nil {
+		return fmt.Errorf("empty response")
+	}
+
+	if resp.Error != nil {
+		return fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
+
+	if resp.Jsonrpc != "2.0" {
+		return fmt.Errorf("invalid jsonrpc version: %s", resp.Jsonrpc)
+	}
+
+	if resp.Result.Err != nil {
+		return fmt.Errorf("simulation failed: %v", resp.Result.Err)
+	}
+
+	if resp.Result.UnitsConsumed == 0 {
+		return fmt.Errorf("invalid units consumed: 0")
+	}
+
+	if len(resp.Result.Accounts) > 0 {
+		for i, account := range resp.Result.Accounts {
+			if account.Owner == "" {
+				return fmt.Errorf("invalid account owner at index %d", i)
+			}
+		}
+	}
+
+	if resp.Result.ReturnData != nil {
+		if resp.Result.ReturnData.ProgramId == "" {
+			return fmt.Errorf("invalid return data: empty program id")
+		}
+	}
+
+	if len(resp.Result.InnerInstructions) > 0 {
+		for i, inner := range resp.Result.InnerInstructions {
+			if len(inner.Instructions) == 0 {
+				return fmt.Errorf("empty instructions for inner instruction at index %d", i)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *solclient) SendTransaction(
 	signedTx string,
 	config *SendTransactionRequest,
 ) (string, error) {
+	if signedTx == "" {
+		return "", fmt.Errorf("invalid input: empty transaction")
+	}
+	if config == nil {
+		config = &SendTransactionRequest{
+			Commitment: string(Finalized),
+			Encoding:   "base64",
+		}
+	}
+
 	requestBody := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -622,15 +1003,7 @@ func (s *solclient) SendTransaction(
 		},
 	}
 
-	resp := struct {
-		Jsonrpc string `json:"jsonrpc"`
-		ID      int    `json:"id"`
-		Result  string `json:"result"`
-		Error   struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error,omitempty"`
-	}{}
+	resp := &SendTransactionResponse{}
 
 	httpResp, err := s.grestyClient.R().
 		SetBody(requestBody).
@@ -644,23 +1017,56 @@ func (s *solclient) SendTransaction(
 		return "", fmt.Errorf("failed to send transaction: %w", errHTTPError)
 	}
 
-	if resp.Error.Message != "" {
-		return "", fmt.Errorf("rpc error: %s (code: %d)",
-			resp.Error.Message, resp.Error.Code)
+	if resp.Error != nil {
+		return "", fmt.Errorf("RPC error: code=%d, message=%s",
+			resp.Error.Code,
+			resp.Error.Message,
+		)
+	}
+
+	if resp.Result == "" {
+		return "", fmt.Errorf("empty transaction signature returned")
 	}
 
 	return resp.Result, nil
 }
 
-func GetNonceAccount(client *rpc.Client, nonceAccountPubkey solana.PublicKey) error {
-	nonceAccountInfo, err := client.GetAccountInfo(ctx, nonceAccountPubkey)
-	if err != nil {
-		return fmt.Errorf("get nonce account error: %w", err)
+func (s *solclient) GetLatestBlockhash(commitmentType CommitmentType) (string, error) {
+	requestBody := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "getLatestBlockhash",
+		"params": []interface{}{
+			map[string]string{
+				"commitment": string(commitmentType),
+			},
+		},
 	}
 
-	// 2. 解析 nonce 数据
-	nonceData, err := system.NonceAccount(nonceAccountInfo.Value.Data.GetBinary())
+	response := &GetLatestBlockhashResponse{}
+	resp, err := s.grestyClient.R().
+		SetBody(requestBody).
+		SetResult(response).
+		Post("/")
 	if err != nil {
-		return fmt.Errorf("parse nonce data error: %w", err)
+		return "", fmt.Errorf("request failed: %w", err)
 	}
+
+	if resp.IsError() {
+		return "", fmt.Errorf("failed to get latest blockhash: %w", errHTTPError)
+	}
+
+	if response.Error != nil {
+		return "", fmt.Errorf("RPC error: code=%d, message=%s",
+			response.Error.Code,
+			response.Error.Message,
+		)
+	}
+
+	blockhash := response.Result.Value.Blockhash
+	if blockhash == "" {
+		return "", fmt.Errorf("invalid blockhash response: empty blockhash")
+	}
+
+	return blockhash, nil
 }

@@ -281,3 +281,23 @@ func TestSolClient_GetTxForAddress(t *testing.T) {
 		t.Logf("respJson: %s", string(respJson))
 	})
 }
+
+func TestSolClient_GetLatestBlockhash(t *testing.T) {
+	solClient, err := NewSolHttpClientAll(baseURL, withDebug)
+	if err != nil {
+		t.Fatalf("初始化客户端失败: %v", err)
+		return
+	}
+
+	t.Run("成功获取最新blockhash", func(t *testing.T) {
+		response, err := solClient.GetLatestBlockhash(Finalized)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, response)
+
+		respJson, err := json.Marshal(response)
+		assert.NoError(t, err)
+		t.Logf("respJson: %s", string(respJson))
+	})
+
+}
