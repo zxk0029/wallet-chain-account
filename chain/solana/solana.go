@@ -1,10 +1,15 @@
 package solana
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
+	"github.com/gagliardetto/solana-go/programs/token"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -565,28 +570,60 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 		response.Msg = err.Error()
 		return response, err
 	}
-	startSlot := req.Start
-	endSlot := req.End
-	signatures, err := c.solCli.getSignaturesInRange(startSlot, endSlot)
-	if err != nil {
-		response.Msg = fmt.Sprintf("failed to get signatures: %v", err)
-		return response, err
+	startSlot, _ := strconv.ParseUint(req.Start, 10, 64)
+	endSlot, _ := strconv.ParseUint(req.End, 10, 64)
+
+	for slot := startSlot; slot <= endSlot; slot++ {
+		blockResult, err := c.solCli.GetBlockBySlot(slot, Signatures)
+		if err != nil {
+			if len(response.BlockHeader) > 0 {
+				response.Code = common2.ReturnCode_SUCCESS
+				response.Msg = fmt.Sprintf("partial success, stopped at slot %d: %v", slot, err)
+				return response, nil
+			}
+			response.Msg = fmt.Sprintf("failed to get signatures for slot %d: %v", slot, err)
+			return response, err
+		}
+
+		if len(blockResult.Signatures) == 0 {
+			continue
+		}
+
+		txResults, err := c.solCli.GetTransactionRange(blockResult.Signatures)
+		if err != nil {
+			if len(response.BlockHeader) > 0 {
+				response.Code = common2.ReturnCode_SUCCESS
+				response.Msg = fmt.Sprintf("partial success, stopped at slot %d: %v", slot, err)
+				return response, nil
+			}
+			response.Msg = fmt.Sprintf("failed to get transactions for slot %d: %v", slot, err)
+			return response, err
+		}
+
+		block, err := organizeTransactionsByBlock(txResults)
+		if err != nil {
+			if len(response.BlockHeader) > 0 {
+				response.Code = common2.ReturnCode_SUCCESS
+				response.Msg = fmt.Sprintf("partial success, stopped at slot %d: %v", slot, err)
+				return response, nil
+			}
+			response.Msg = fmt.Sprintf("failed to organize transactions for slot %d: %v", slot, err)
+			return response, err
+		}
+
+		if len(block) > 0 {
+			response.BlockHeader = append(response.BlockHeader, block...)
+		}
 	}
-	txResults, err := c.solCli.GetTransactionRange(signatures)
-	if err != nil {
-		response.Msg = fmt.Sprintf("failed to get transactions: %v", err)
-		return response, err
-	}
-	blocks, err := organizeTransactionsByBlock(txResults)
-	if err != nil {
-		response.Msg = fmt.Sprintf("failed to organize transactions: %v", err)
-		return response, err
+
+	if len(response.BlockHeader) == 0 {
+		response.Code = common2.ReturnCode_SUCCESS
+		response.Msg = "no transactions found in range"
+		return response, nil
 	}
 
 	response.Code = common2.ReturnCode_SUCCESS
 	response.Msg = "success"
-	response.Blocks = blocks
-
 	return response, nil
 }
 
@@ -616,6 +653,70 @@ func validateBlockRangeRequest(req *account.BlockByRangeRequest) error {
 	}
 
 	return nil
+}
+
+func organizeTransactionsByBlock(txResults []*TransactionResult) ([]*account.BlockHeader, error) {
+	if len(txResults) == 0 {
+		return nil, nil
+	}
+
+	blockMap := make(map[uint64]*account.BlockHeader)
+
+	for _, txResult := range txResults {
+		if txResult == nil {
+			continue
+		}
+
+		slot := txResult.Slot
+
+		block, exists := blockMap[slot]
+		if !exists {
+			block = &account.BlockHeader{
+				Number: strconv.FormatUint(slot, 10),
+			}
+
+			if txResult.BlockTime != nil {
+				block.Time = uint64(*txResult.BlockTime)
+			}
+
+			if len(txResult.Transaction.Signatures) > 0 {
+				block.Hash = txResult.Transaction.Signatures[0]
+			}
+
+			txHashes := make([]string, 0)
+			for _, sig := range txResult.Transaction.Signatures {
+				txHashes = append(txHashes, sig)
+			}
+			block.TxHash = strings.Join(txHashes, ",")
+
+			block.GasUsed = txResult.Meta.ComputeUnitsConsumed
+
+			blockMap[slot] = block
+		} else {
+			if len(txResult.Transaction.Signatures) > 0 {
+				if block.TxHash != "" {
+					block.TxHash += "," + txResult.Transaction.Signatures[0]
+				} else {
+					block.TxHash = txResult.Transaction.Signatures[0]
+				}
+			}
+
+			block.GasUsed += txResult.Meta.ComputeUnitsConsumed
+		}
+	}
+
+	blocks := make([]*account.BlockHeader, 0, len(blockMap))
+	for _, block := range blockMap {
+		blocks = append(blocks, block)
+	}
+
+	sort.Slice(blocks, func(i, j int) bool {
+		heightI, _ := strconv.ParseUint(blocks[i].Number, 10, 64)
+		heightJ, _ := strconv.ParseUint(blocks[j].Number, 10, 64)
+		return heightI < heightJ
+	})
+
+	return blocks, nil
 }
 
 func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
@@ -666,66 +767,66 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 
 	} else {
 
-		//mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
-		//
-		//fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
-		//	fromPubkey,
-		//	mintPubkey,
-		//)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
-		//}
-		//
-		//toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
-		//	toPubkey,
-		//	mintPubkey,
-		//)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
-		//}
+		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
 
-		//tokenInfo, err := c.sdkClient.GetTokenSupply(context.Background(), data.ContractAddress, rpc.CommitmentFinalized)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to get token info: %w", err)
-		//}
-		//decimals := tokenInfo.Decimals
+		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			fromPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
+		}
 
-		//valueFloat, err := strconv.ParseFloat(data.Value, 64)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to parse value: %w", err)
-		//}
-		//actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
-		//
-		//transferInstruction := token.NewTransferInstruction(
-		//	actualValue,
-		//	fromTokenAccount,
-		//	toTokenAccount,
-		//	fromPubkey,
-		//	[]solana.PublicKey{},
-		//).Build()
-		//
-		//accountInfo, err := c.solCli.Client.GetAccountInfo(context.Background(), toTokenAccount.String())
-		//if err != nil || accountInfo.Data == nil {
-		//
-		//	createATAInstruction := associatedtokenaccount.NewCreateInstruction(
-		//		fromPubkey,
-		//		toPubkey,
-		//		mintPubkey,
-		//	).Build()
-		//
-		//	tx, err = solana.NewTransaction(
-		//		[]solana.Instruction{createATAInstruction, transferInstruction},
-		//		solana.MustHashFromBase58(data.Nonce),
-		//		solana.TransactionPayer(fromPubkey),
-		//	)
-		//} else {
-		//	// 直接创建转账交易
-		//	tx, err = solana.NewTransaction(
-		//		[]solana.Instruction{transferInstruction},
-		//		solana.MustHashFromBase58(data.Nonce),
-		//		solana.TransactionPayer(fromPubkey),
-		//	)
-		//}
+		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
+			toPubkey,
+			mintPubkey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to FindAssociatedTokenAddress: %w", err)
+		}
+
+		tokenInfo, err := c.sdkClient.GetTokenSupply(context.Background(), data.ContractAddress, rpc.CommitmentFinalized)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get token info: %w", err)
+		}
+		decimals := tokenInfo.Value.Decimals
+
+		valueFloat, err := strconv.ParseFloat(data.Value, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse value: %w", err)
+		}
+		actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
+
+		transferInstruction := token.NewTransferInstruction(
+			actualValue,
+			fromTokenAccount,
+			toTokenAccount,
+			fromPubkey,
+			[]solana.PublicKey{},
+		).Build()
+
+		accountInfo, err := c.sdkClient.GetAccountInfo(context.Background(), toTokenAccount.String())
+		if err != nil || accountInfo.Data == nil {
+
+			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
+				fromPubkey,
+				toPubkey,
+				mintPubkey,
+			).Build()
+
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{createATAInstruction, transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		} else {
+			// 直接创建转账交易
+			tx, err = solana.NewTransaction(
+				[]solana.Instruction{transferInstruction},
+				solana.MustHashFromBase58(data.Nonce),
+				solana.TransactionPayer(fromPubkey),
+			)
+		}
 	}
 
 	//https://github.com/gagliardetto/solana-go/tree/main?tab=readme-ov-file#transfer-sol-from-one-wallet-to-another-wallet
