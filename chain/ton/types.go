@@ -1,5 +1,11 @@
 package ton
 
+type EstimateFeeRequest struct {
+	Address      string `json:"address"`
+	Body         string `json:"body"`
+	IgnoreChksig bool   `json:"ignore_chksig"`
+}
+
 type Transactions struct {
 	Account       string `json:"account"`
 	Hash          string `json:"hash"`
@@ -134,8 +140,12 @@ type SendTxResult struct {
 }
 
 type EstimateFeeResult struct {
-	InFwdFee   string `json:"in_fwd_fee"`
-	StorageFee string `json:"storage_fee"`
-	GasFee     string `json:"gas_fee"`
-	FwdFee     string `json:"fwd_fee"`
+	InFwdFee   uint64 `json:"in_fwd_fee"`
+	StorageFee uint64 `json:"storage_fee"`
+	GasFee     uint64 `json:"gas_fee"`
+	FwdFee     uint64 `json:"fwd_fee"`
+}
+
+type SourceFeesResult struct {
+	SourceFees *EstimateFeeResult `json:"source_fees"`
 }
