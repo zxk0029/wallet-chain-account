@@ -393,6 +393,61 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 	}, nil
 }
 
+func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var txStruct TxStructure
+	if err := json.Unmarshal(jsonBytes, &txStruct); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+
+	bytes, err := BuildUnSignTransaction(&txStruct)
+	if err != nil {
+		log.Error("build unsign transaction fail", "err", err)
+		return nil, err
+	}
+	txHex := hex.EncodeToString(bytes)
+
+	return &account.UnSignTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "create unsigned transaction success",
+		UnSignTx: txHex,
+	}, nil
+}
+
+func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
+	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
+	if err != nil {
+		log.Error("decode string fail", "err", err)
+		return nil, err
+	}
+	var txStruct TxStructure
+	if err := json.Unmarshal(jsonBytes, &txStruct); err != nil {
+		log.Error("parse json fail", "err", err)
+		return nil, err
+	}
+	signBytes, err := hex.DecodeString(req.Signature)
+	if err != nil {
+		log.Error("decode sign fail", "err", err)
+		return nil, err
+	}
+	bytes, err := BuildSignTransaction(&txStruct, signBytes)
+	if err != nil {
+		log.Error("build sign transaction fail", "err", err)
+		return nil, err
+	}
+	signedTx := hex.EncodeToString(bytes)
+	return &account.SignedTransactionResponse{
+		Code:     common2.ReturnCode_SUCCESS,
+		Msg:      "build signed transaction success",
+		SignedTx: signedTx,
+	}, nil
+}
+
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
 	txbytes, err := base64.StdEncoding.DecodeString(req.RawTx)
 	if err != nil {
@@ -413,37 +468,6 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 		Code:   common2.ReturnCode_SUCCESS,
 		Msg:    "send tx success",
 		TxHash: resp.TxResponse.TxHash,
-	}, nil
-}
-
-func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
-	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
-	if err != nil {
-		log.Error("decode string fail", "err", err)
-		return nil, err
-	}
-	var txStruct TxStructure
-	if err := json.Unmarshal(jsonBytes, &txStruct); err != nil {
-		log.Error("parse json fail", "err", err)
-		return nil, err
-	}
-
-	bytes, err := BuildUnSignTransaction(&txStruct)
-	if err != nil {
-		log.Error("build unsign transaction fail", "err", err)
-		return nil, err
-	}
-	return &account.UnSignTransactionResponse{
-		Code:     common2.ReturnCode_SUCCESS,
-		Msg:      "create unsigned transaction success",
-		UnSignTx: string(bytes),
-	}, nil
-}
-
-func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
-	return &account.SignedTransactionResponse{
-		Code: common2.ReturnCode_SUCCESS,
-		Msg:  "build signed transaction success",
 	}, nil
 }
 

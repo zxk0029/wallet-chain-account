@@ -47,7 +47,7 @@ type NormalTransaction struct {
 }
 
 type TxStructure struct {
-	chainId         string `json:"chainId"`
+	ChainId         string `json:"chainId"`
 	FromAddress     string `json:"from_address"`
 	ToAddress       string `json:"to_address"`
 	Amount          int64  `json:"amount"`

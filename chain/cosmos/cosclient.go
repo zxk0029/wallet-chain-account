@@ -12,12 +12,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	sdktx "github.com/cosmos/cosmos-sdk/types/tx"
+	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -61,29 +61,34 @@ func DialCosmosClient(ctx context.Context, conf *config.Config) (*CosmosClient, 
 			return nil, fmt.Errorf("address unavailable (%s)", nodeUrl)
 		}
 
-		ctx := client.Context{}
+		interfaceRegistry := codectypes.NewInterfaceRegistry()
+		codecMarshaler := codec.NewProtoCodec(interfaceRegistry)
+		txConfig := authtx.NewTxConfig(codecMarshaler, authtx.DefaultSignModes)
+		clientCtx := client.Context{}.
+			WithCodec(codecMarshaler).
+			WithInterfaceRegistry(interfaceRegistry).
+			WithTxConfig(txConfig)
+
 		conn, err := client.NewClientFromNode(nodeUrl)
 		if err != nil {
 			log.Error("failed to retry dial nodeUrl (%s): %w", nodeUrl, err)
 			return nil, err
 		}
+		clientCtx = clientCtx.WithClient(conn)
 
 		dataClient, err := oklink.NewChainExplorerAdaptor(dataApiKey, dataApiUrl+"/", false, time.Duration(timeOut))
 		if err != nil {
 			log.Error("failed cosmos  new chain explorer adaptor", "err", err)
 			return nil, err
 		}
-		codec := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
-		ctx = ctx.WithClient(conn).WithKeyring(keyring.NewInMemory(codec))
 		return &CosmosClient{
-			context: ctx,
-			rpchttp: conn,
-			codec:   codec,
-
+			context:         clientCtx,
+			rpchttp:         conn,
+			codec:           codecMarshaler,
 			dataClient:      dataClient,
-			bankClient:      banktypes.NewQueryClient(ctx),
-			txServiceClient: sdktx.NewServiceClient(ctx),
-			authClient:      authv1beta1.NewQueryClient(ctx),
+			bankClient:      banktypes.NewQueryClient(clientCtx),
+			txServiceClient: sdktx.NewServiceClient(clientCtx),
+			authClient:      authv1beta1.NewQueryClient(clientCtx),
 		}, nil
 
 	})

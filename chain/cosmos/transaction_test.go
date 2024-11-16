@@ -7,9 +7,9 @@ import (
 )
 
 // success
-func TestCosmos_CreateUnSignTransaction(t *testing.T) {
+func TestCosmos_BuildUnSignTransaction(t *testing.T) {
 	txStruct := &TxStructure{
-		chainId:       "cosmoshub-4",
+		ChainId:       "cosmoshub-4",
 		FromAddress:   "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
 		ToAddress:     "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
 		Amount:        100000,
@@ -27,7 +27,7 @@ func TestCosmos_CreateUnSignTransaction(t *testing.T) {
 
 func TestCosmos_CreateSignTransaction(t *testing.T) {
 	txStruct := &TxStructure{
-		chainId:       "cosmoshub-4",
+		ChainId:       "cosmoshub-4",
 		FromAddress:   "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
 		ToAddress:     "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
 		Amount:        100000,

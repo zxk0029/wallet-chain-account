@@ -2,11 +2,9 @@ package cosmos
 
 import (
 	"context"
+	"cosmossdk.io/math"
 	"encoding/hex"
 	"fmt"
-	"math/big"
-
-	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -25,14 +23,14 @@ func NewTxBuilder(txStruct *TxStructure) (client.TxBuilder, client.TxConfig, err
 	txBuilder := txConfig.NewTxBuilder()
 
 	// coin amount
-	amount := new(big.Int).SetInt64(txStruct.Amount)
-	amount = amount.Mul(amount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(txStruct.Decimal)), nil))
-	// fee
-	fee := new(big.Int).SetInt64(txStruct.FeeAmount)
-	fee = fee.Mul(fee, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(txStruct.Decimal)), nil))
+	//amount := new(big.Int).SetInt64(txStruct.Amount)
+	//amount = amount.Mul(amount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(txStruct.Decimal)), nil))
+	//// fee
+	//fee := new(big.Int).SetInt64(txStruct.FeeAmount)
+	//fee = fee.Mul(fee, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(txStruct.Decimal)), nil))
 	// set fieldx
 	txBuilder.SetGasLimit(txStruct.GasLimit)
-	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin("uatom", math.NewInt(fee.Int64()))))
+	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin("uatom", math.NewInt(txStruct.FeeAmount))))
 	txBuilder.SetMemo(txStruct.Memo)
 	fromAddr, err := sdk.AccAddressFromBech32(txStruct.FromAddress)
 	if err != nil {
@@ -44,7 +42,7 @@ func NewTxBuilder(txStruct *TxStructure) (client.TxBuilder, client.TxConfig, err
 		log.Error("to address AccAddressFromBech32 fail", "err", err)
 		return nil, nil, err
 	}
-	amountCoin := sdk.NewCoins(sdk.NewCoin("uatom", math.NewInt(amount.Int64())))
+	amountCoin := sdk.NewCoins(sdk.NewCoin("uatom", math.NewInt(txStruct.Amount)))
 	msg := banktypes.NewMsgSend(fromAddr, toAddr, amountCoin)
 
 	err = txBuilder.SetMsgs(msg)
@@ -71,7 +69,7 @@ func BuildUnSignTransaction(txStruct *TxStructure) ([]byte, error) {
 	}
 	pubKey := &secp256k1.PubKey{Key: pubKeyBytes}
 	signerData := authsigning.SignerData{
-		ChainID:       txStruct.chainId,
+		ChainID:       txStruct.ChainId,
 		AccountNumber: txStruct.AccountNumber,
 		Sequence:      txStruct.Sequence,
 		PubKey:        pubKey,

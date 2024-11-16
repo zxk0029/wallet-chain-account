@@ -1,6 +1,8 @@
 package cosmos
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"testing"
@@ -145,6 +147,76 @@ func TestCosmos_GetBlockByRange(t *testing.T) {
 		End:   "22879896",
 	}
 	response, err := chainAdaptor.GetBlockByRange(request)
+	assert.NoError(t, err)
+	fmt.Println("response", response)
+}
+
+func TestCosmos_CreateUnSignTransaction(t *testing.T) {
+	txStruct := &TxStructure{
+		ChainId:         "cosmoshub-4",
+		FromAddress:     "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
+		ToAddress:       "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
+		ContractAddress: "",
+		Amount:          10000,
+		GasLimit:        137674,
+		FeeAmount:       10000,
+		Sequence:        0,
+		AccountNumber:   3014650,
+		Decimal:         6,
+		Memo:            "10086",
+		PubKey:          "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
+	}
+
+	txBytes, err := json.Marshal(txStruct)
+	assert.NoError(t, err)
+
+	base64Tx := base64.StdEncoding.EncodeToString(txBytes)
+
+	chainAdaptor, err := getChainAdaptor()
+	assert.NoError(t, err)
+
+	request := &account.UnSignTransactionRequest{
+		Chain:    ChainName,
+		Network:  NetWork,
+		Base64Tx: base64Tx,
+	}
+
+	response, err := chainAdaptor.CreateUnSignTransaction(request)
+	assert.NoError(t, err)
+	fmt.Println("response", response)
+}
+
+func TestCosmos_BuildSignedTransaction(t *testing.T) {
+	txStruct := &TxStructure{
+		ChainId:         "cosmoshub-4",
+		FromAddress:     "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
+		ToAddress:       "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
+		ContractAddress: "",
+		Amount:          10000,
+		GasLimit:        137674,
+		FeeAmount:       10000,
+		Sequence:        0,
+		AccountNumber:   3014650,
+		Decimal:         6,
+		Memo:            "10086",
+		PubKey:          "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
+	}
+
+	txBytes, err := json.Marshal(txStruct)
+	assert.NoError(t, err)
+
+	base64Tx := base64.StdEncoding.EncodeToString(txBytes)
+
+	chainAdaptor, err := getChainAdaptor()
+	assert.NoError(t, err)
+
+	request := &account.SignedTransactionRequest{
+		Chain:    ChainName,
+		Network:  NetWork,
+		Base64Tx: base64Tx,
+	}
+
+	response, err := chainAdaptor.BuildSignedTransaction(request)
 	assert.NoError(t, err)
 	fmt.Println("response", response)
 }
