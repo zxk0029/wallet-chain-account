@@ -125,19 +125,6 @@ func TestCosmos_GetTxByAddress(t *testing.T) {
 	fmt.Println("response", response)
 }
 
-func TestCosmos_SendTx(t *testing.T) {
-	chainAdaptor, err := getChainAdaptor()
-	assert.NoError(t, err)
-
-	req := &account.SendTxRequest{
-		//RawTx: "CpoBCo8BChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEm8KLWNvc21vczE5dGh4c3VubDlsenl3Z2xzbmR0aDVhMjc4d3RhdmF3enpwdjQ0cRItY29zbW9zMWw2dnVsMjBxNzRndzU2ZnBlZDhzcmtqcTJ4OGQ5bTMwNWdueHIyGg8KBXVhdG9tEgYxMDAwMDASBjEwMTExMRJoClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDi7ANMzipos1bc45s2u2g+ar2Fu1+Z8lkzFTUtoDjIccSBAoCCAEYChIUCg4KBXVhdG9tEgUxMDAwMBDKswgaQAW5UeOw1oNp6SJQCwbVc10wdBB6lJ1MGVRuTA2i8lUtZbzgeYbU+TJd67iR0UAkjzYvjFI/R18dKlEbmboRykw=",
-		RawTx: "CpoBCo8BChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEm8KLWNvc21vczE5dGh4c3VubDlsenl3Z2xzbmR0aDVhMjc4d3RhdmF3enpwdjQ0cRItY29zbW9zMWw2dnVsMjBxNzRndzU2ZnBlZDhzcmtqcTJ4OGQ5bTMwNWdueHIyGg8KBXVhdG9tEgYxMDAwMDASBjEwMTExMRJoClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDi7ANMzipos1bc45s2u2g+ar2Fu1+Z8lkzFTUtoDjIccSBAoCCAEYCxIUCg4KBXVhdG9tEgUxMDAwMBDKswgaQMzfcYBU/NkVBwk49x8+TNWviGPLQfzfEFymR6RmwLJyNIq0E+x5IELke6Q0pQPWF1yqZVOYyDZa13kpCQkEQVI=",
-	}
-	response, err := chainAdaptor.SendTx(req)
-	assert.NoError(t, err)
-	fmt.Printf("response TxHash=%s \n", response.TxHash)
-}
-
 func TestCosmos_GetBlockByRange(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
@@ -210,13 +197,27 @@ func TestCosmos_BuildSignedTransaction(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
 
+	signStr := "7e115128104f37ba74f990807c4926555a483ab88e55e157428253e686fb01a92f4ad6892bbb1a080b77795c815eb54fa94002a938ca98a3edf2f220a8b31ba001"
 	request := &account.SignedTransactionRequest{
-		Chain:    ChainName,
-		Network:  NetWork,
-		Base64Tx: base64Tx,
+		Chain:     ChainName,
+		Network:   NetWork,
+		Signature: signStr,
+		Base64Tx:  base64Tx,
+		PublicKey: "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
 	}
-
 	response, err := chainAdaptor.BuildSignedTransaction(request)
 	assert.NoError(t, err)
 	fmt.Println("response", response)
+}
+
+func TestCosmos_SendTx(t *testing.T) {
+	chainAdaptor, err := getChainAdaptor()
+	assert.NoError(t, err)
+
+	req := &account.SendTxRequest{
+		RawTx: "0a98010a8e010a1c2f636f736d6f732e62616e6b2e763162657461312e4d736753656e64126e0a2d636f736d6f73317167617338787070746e7030396c796c33326b66703630686c64676573366775753238716d6b122d636f736d6f73316c3676756c323071373467773536667065643873726b6a7132783864396d333035676e7872321a0e0a057561746f6d120531303030301205313030383612660a4e0a460a1f2f636f736d6f732e63727970746f2e736563703235366b312e5075624b657912230a2103f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a12040a02080112140a0e0a057561746f6d1205313030303010cab3081a417e115128104f37ba74f990807c4926555a483ab88e55e157428253e686fb01a92f4ad6892bbb1a080b77795c815eb54fa94002a938ca98a3edf2f220a8b31ba001",
+	}
+	response, err := chainAdaptor.SendTx(req)
+	assert.NoError(t, err)
+	fmt.Printf("response TxHash=%s \n", response.TxHash)
 }

@@ -410,12 +410,12 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 		log.Error("build unsign transaction fail", "err", err)
 		return nil, err
 	}
-	txHex := hex.EncodeToString(bytes)
+	unSignTx := hex.EncodeToString(bytes)
 
 	return &account.UnSignTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
 		Msg:      "create unsigned transaction success",
-		UnSignTx: txHex,
+		UnSignTx: unSignTx,
 	}, nil
 }
 
@@ -449,7 +449,8 @@ func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequ
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	txbytes, err := base64.StdEncoding.DecodeString(req.RawTx)
+	//txbytes, err := base64.StdEncoding.DecodeString(req.RawTx)
+	txbytes, err := hex.DecodeString(req.RawTx)
 	if err != nil {
 		return &account.SendTxResponse{
 			Code: common2.ReturnCode_ERROR,
