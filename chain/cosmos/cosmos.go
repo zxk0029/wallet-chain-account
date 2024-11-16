@@ -426,10 +426,12 @@ func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionReq
 		log.Error("build unsign transaction fail", "err", err)
 		return nil, err
 	}
+	txHex := hex.EncodeToString(bytes)
+
 	return &account.UnSignTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
 		Msg:      "create unsigned transaction success",
-		UnSignTx: string(bytes),
+		UnSignTx: txHex,
 	}, nil
 }
 
