@@ -2,8 +2,6 @@ module github.com/dapplink-labs/wallet-chain-account
 
 go 1.22.7
 
-toolchain go1.22.8
-
 require (
 	cosmossdk.io/api v0.7.5
 	github.com/aptos-labs/aptos-go-sdk v1.0.0
@@ -11,7 +9,7 @@ require (
 	github.com/blocto/solana-go-sdk v1.30.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/cosmos/cosmos-sdk v0.50.8
-	github.com/dapplink-labs/chain-explorer-api v0.0.1-beta
+	github.com/dapplink-labs/chain-explorer-api v0.0.3-0.20241104144036-620933cbffa1
 	github.com/ethereum/go-ethereum v1.14.11
 	github.com/fbsobreira/gotron-sdk v0.0.0-20230907131216-1e824406fe8c
 	github.com/gagliardetto/solana-go v1.11.0
@@ -21,7 +19,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.9.0
-	github.com/tendermint/tendermint v0.34.24
 	github.com/xssnick/tonutils-go v1.10.2
 	golang.org/x/crypto v0.27.0
 	google.golang.org/grpc v1.67.1
@@ -157,9 +154,9 @@ require (
 	github.com/zondax/ledger-go v0.14.3 // indirect
 	go.etcd.io/bbolt v1.4.0-alpha.0.0.20240404170359-43604f3112c5 // indirect
 	go.mongodb.org/mongo-driver v1.11.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	go.uber.org/zap v1.23.0 // indirect
+	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
@@ -176,17 +173,20 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-require github.com/cometbft/cometbft v0.38.13
+require (
+	cosmossdk.io/math v1.3.0
+	github.com/cometbft/cometbft v0.38.13
+)
 
 require (
 	cosmossdk.io/collections v0.4.0 // indirect
 	cosmossdk.io/core v0.11.0 // indirect
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
-	cosmossdk.io/math v1.3.0 // indirect
 	cosmossdk.io/store v1.1.0 // indirect
 	cosmossdk.io/x/tx v0.13.3 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
+	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
