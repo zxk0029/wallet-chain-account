@@ -150,7 +150,7 @@ func TestClient_BroadcastTx(t *testing.T) {
 
 	resp, err := c.BroadcastTx([]byte(txMsg))
 	assert.NoError(t, err)
-	fmt.Printf("result: %v \n", resp.Hash.String())
+	fmt.Printf("result: %v \n", resp.TxResponse.TxHash)
 }
 
 // success

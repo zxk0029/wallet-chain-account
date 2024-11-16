@@ -47,6 +47,7 @@ type NormalTransaction struct {
 }
 
 type TxStructure struct {
+	chainId         string `json:"chainId"`
 	FromAddress     string `json:"from_address"`
 	ToAddress       string `json:"to_address"`
 	Amount          int64  `json:"amount"`
@@ -54,8 +55,10 @@ type TxStructure struct {
 	GasLimit        uint64 `json:"gas_limit"`
 	FeeAmount       int64  `json:"free_amount"`
 	Memo            string `json:"memo"`
+	Decimal         int    `json:"decimal"`
 	Sequence        uint64 `json:"sequence"`
-	accountNumber   string `json:"account_number"`
+	AccountNumber   uint64 `json:"account_number"`
+	PubKey          string `json:"pub_key"`
 }
 
 type NativeBlockResponse struct {

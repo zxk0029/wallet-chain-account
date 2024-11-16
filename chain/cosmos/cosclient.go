@@ -212,15 +212,16 @@ func (c *CosmosClient) GetAddressFromPubKey(key []byte) string {
 	return address
 }
 
-func (c *CosmosClient) BroadcastTx(txBytes []byte) (*ctypes.ResultBroadcastTxCommit, error) {
+func (c *CosmosClient) BroadcastTx(txBytes []byte) (*sdktx.BroadcastTxResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
 	defer cancel()
 
-	return c.rpchttp.BroadcastTxCommit(ctx, txBytes)
-	//return c.txServiceClient.BroadcastTx(ctx, &sdktx.BroadcastTxRequest{
-	//	TxBytes: txBytes,
-	//	Mode:    sdktx.BroadcastMode_BROADCAST_MODE_SYNC,
-	//})
+	//return c.context.BroadcastTxSync(txBytes)
+	//return c.rpchttp.BroadcastTxCommit(ctx, txBytes)
+	return c.txServiceClient.BroadcastTx(ctx, &sdktx.BroadcastTxRequest{
+		TxBytes: txBytes,
+		Mode:    sdktx.BroadcastMode_BROADCAST_MODE_SYNC,
+	})
 }
 
 func (c *CosmosClient) GetBlock(height int64) (*ctypes.ResultBlock, error) {

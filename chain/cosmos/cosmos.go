@@ -394,7 +394,14 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	ret, err := c.client.BroadcastTx([]byte(req.RawTx))
+	txbytes, err := base64.StdEncoding.DecodeString(req.RawTx)
+	if err != nil {
+		return &account.SendTxResponse{
+			Code: common2.ReturnCode_ERROR,
+			Msg:  "BroadcastTx base64 decode tx fail",
+		}, err
+	}
+	resp, err := c.client.BroadcastTx(txbytes)
 	if err != nil {
 		return &account.SendTxResponse{
 			Code: common2.ReturnCode_ERROR,
@@ -405,7 +412,7 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 	return &account.SendTxResponse{
 		Code:   common2.ReturnCode_SUCCESS,
 		Msg:    "send tx success",
-		TxHash: ret.Hash.String(),
+		TxHash: resp.TxResponse.TxHash,
 	}, nil
 }
 
