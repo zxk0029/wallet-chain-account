@@ -2,6 +2,7 @@ package cosmos
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -142,16 +143,16 @@ func TestCosmos_CreateUnSignTransaction(t *testing.T) {
 	txStruct := &TxStructure{
 		ChainId:         "cosmoshub-4",
 		FromAddress:     "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
-		ToAddress:       "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
+		ToAddress:       "cosmos19thxsunl9lzywglsndth5a278wtavawzzpv44q",
 		ContractAddress: "",
 		Amount:          10000,
 		GasLimit:        137674,
 		FeeAmount:       10000,
-		Sequence:        0,
+		Sequence:        1,
 		AccountNumber:   3014650,
 		Decimal:         6,
 		Memo:            "10086",
-		PubKey:          "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
+		PubKey:          "032d535553c70dfbb9c13f32cb6d1002a4b421beff39009670e29a7e51fb88ec3f",
 	}
 
 	txBytes, err := json.Marshal(txStruct)
@@ -177,16 +178,16 @@ func TestCosmos_BuildSignedTransaction(t *testing.T) {
 	txStruct := &TxStructure{
 		ChainId:         "cosmoshub-4",
 		FromAddress:     "cosmos1qgas8xpptnp09lyl32kfp60hldges6guu28qmk",
-		ToAddress:       "cosmos1l6vul20q74gw56fped8srkjq2x8d9m305gnxr2",
+		ToAddress:       "cosmos19thxsunl9lzywglsndth5a278wtavawzzpv44q",
 		ContractAddress: "",
 		Amount:          10000,
 		GasLimit:        137674,
 		FeeAmount:       10000,
-		Sequence:        0,
+		Sequence:        1,
 		AccountNumber:   3014650,
 		Decimal:         6,
 		Memo:            "10086",
-		PubKey:          "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
+		PubKey:          "032d535553c70dfbb9c13f32cb6d1002a4b421beff39009670e29a7e51fb88ec3f",
 	}
 
 	txBytes, err := json.Marshal(txStruct)
@@ -203,7 +204,7 @@ func TestCosmos_BuildSignedTransaction(t *testing.T) {
 		Network:   NetWork,
 		Signature: signStr,
 		Base64Tx:  base64Tx,
-		PublicKey: "03f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a",
+		PublicKey: "032d535553c70dfbb9c13f32cb6d1002a4b421beff39009670e29a7e51fb88ec3f",
 	}
 	response, err := chainAdaptor.BuildSignedTransaction(request)
 	assert.NoError(t, err)
@@ -214,10 +215,14 @@ func TestCosmos_SendTx(t *testing.T) {
 	chainAdaptor, err := getChainAdaptor()
 	assert.NoError(t, err)
 
+	rawTx := "0A98010A8E010A1C2F636F736D6F732E62616E6B2E763162657461312E4D736753656E64126E0A2D636F736D6F73317167617338787070746E7030396C796C33326B66703630686C64676573366775753238716D6B122D636F736D6F73313974687873756E6C396C7A7977676C736E64746835613237387774617661777A7A70763434711A0E0A057561746F6D120531303030301205313030383712670A500A460A1F2F636F736D6F732E63727970746F2E736563703235366B312E5075624B657912230A21032D535553C70DFBB9C13F32CB6D1002A4B421BEFF39009670E29A7E51FB88EC3F12040A020801180312130A0D0A057561746F6D12043130303010CAB3081A4020F0753ED637D1125011466E78085BEFA9842F8591C5B92012A5E9737D8E63943BACD8046712306E0E7E821AC4C731AE6928C35FAA414D23C361186DDBFD0D8D"
 	req := &account.SendTxRequest{
-		RawTx: "0a98010a8e010a1c2f636f736d6f732e62616e6b2e763162657461312e4d736753656e64126e0a2d636f736d6f73317167617338787070746e7030396c796c33326b66703630686c64676573366775753238716d6b122d636f736d6f73316c3676756c323071373467773536667065643873726b6a7132783864396d333035676e7872321a0e0a057561746f6d120531303030301205313030383612660a4e0a460a1f2f636f736d6f732e63727970746f2e736563703235366b312e5075624b657912230a2103f16c9160c81b806a04da3c27d9200fe684aad79b9fcdcccfac8aa60ad7f0a56a12040a02080112140a0e0a057561746f6d1205313030303010cab3081a417e115128104f37ba74f990807c4926555a483ab88e55e157428253e686fb01a92f4ad6892bbb1a080b77795c815eb54fa94002a938ca98a3edf2f220a8b31ba001",
+		RawTx: rawTx,
 	}
 	response, err := chainAdaptor.SendTx(req)
 	assert.NoError(t, err)
 	fmt.Printf("response TxHash=%s \n", response.TxHash)
+	txbytes, err := hex.DecodeString(rawTx)
+	assert.NoError(t, err)
+	fmt.Printf("base64 RawTx=%s\n", base64.StdEncoding.EncodeToString(txbytes))
 }
