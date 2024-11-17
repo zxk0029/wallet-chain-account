@@ -430,7 +430,10 @@ func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequ
 		log.Error("parse json fail", "err", err)
 		return nil, err
 	}
-	signBytes, err := hex.DecodeString(req.Signature)
+
+	//fmt.Printf("req.Signature-1=%s \n", req.Signature)
+	//fmt.Printf("req.Signature-2=%s \n", req.Signature[:len(req.Signature)-2])
+	signBytes, err := hex.DecodeString(req.Signature[:len(req.Signature)-2])
 	if err != nil {
 		log.Error("decode sign fail", "err", err)
 		return nil, err
@@ -449,7 +452,6 @@ func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequ
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
-	//txbytes, err := base64.StdEncoding.DecodeString(req.RawTx)
 	txbytes, err := hex.DecodeString(req.RawTx)
 	if err != nil {
 		return &account.SendTxResponse{
@@ -457,6 +459,7 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 			Msg:  "BroadcastTx base64 decode tx fail",
 		}, err
 	}
+	// broadcast
 	resp, err := c.client.BroadcastTx(txbytes)
 	if err != nil {
 		return &account.SendTxResponse{
