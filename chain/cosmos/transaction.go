@@ -5,6 +5,7 @@ import (
 	"cosmossdk.io/math"
 	"encoding/hex"
 	"fmt"
+	bftcrypto "github.com/cometbft/cometbft/crypto"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -100,7 +101,7 @@ func BuildUnSignTransaction(txStruct *TxStructure) ([]byte, error) {
 		return nil, err
 	}
 
-	return bytesToSign, nil
+	return bftcrypto.Sha256(bytesToSign), nil
 }
 
 func BuildSignTransaction(txStruct *TxStructure, signature []byte) ([]byte, error) {
