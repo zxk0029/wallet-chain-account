@@ -2,14 +2,14 @@ package chaindispatcher
 
 import (
 	"context"
-
 	"runtime/debug"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/dapplink-labs/wallet-chain-account/chain"
 	"github.com/dapplink-labs/wallet-chain-account/chain/aptos"
@@ -41,11 +41,11 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		registry: make(map[ChainType]chain.IChainAdaptor),
 	}
 	chainAdaptorFactoryMap := map[string]func(conf *config.Config) (chain.IChainAdaptor, error){
-		aptos.ChainName:    aptos.NewChainAdaptor,
 		ethereum.ChainName: ethereum.NewChainAdaptor,
 		cosmos.ChainName:   cosmos.NewChainAdaptor,
 		solana.ChainName:   solana.NewChainAdaptor,
 		tron.ChainName:     tron.NewChainAdaptor,
+		aptos.ChainName:    aptos.NewChainAdaptor,
 		sui.ChainName:      sui.NewSuiAdaptor,
 		ton.ChainName:      ton.NewChainAdaptor,
 	}
