@@ -130,7 +130,7 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 		GasLimit:         blockInfo.GasLimit,
 		GasUsed:          blockInfo.GasUsed,
 		Time:             blockInfo.Time,
-		Extra:            string(blockInfo.Extra),
+		Extra:            hex.EncodeToString(blockInfo.Extra),
 		MixDigest:        blockInfo.MixDigest.String(),
 		Nonce:            strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
 		BaseFee:          blockInfo.BaseFee.String(),
@@ -195,10 +195,13 @@ func (c *ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*accou
 	var txListRet []*account.BlockInfoTransactionList
 	for _, v := range block.Transactions {
 		bitlItem := &account.BlockInfoTransactionList{
-			From:   v.From,
-			To:     v.To,
-			Hash:   v.Hash,
-			Amount: v.Value,
+			From:           v.From,
+			To:             v.To,
+			TokenAddress:   v.To,
+			ContractWallet: v.To,
+			Hash:           v.Hash,
+			Height:         block.Height,
+			Amount:         v.Value,
 		}
 		txListRet = append(txListRet, bitlItem)
 	}
