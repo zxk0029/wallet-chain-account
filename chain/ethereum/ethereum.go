@@ -412,11 +412,6 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 	} else {
 		txStatus = account.TxStatus_Failed
 	}
-	fmt.Printf("========================================")
-	fmt.Println("beforeToAddress===", beforeToAddress)
-	fmt.Println("beforeTokenAddress===", beforeTokenAddress)
-	fmt.Println("beforeValue===", beforeValue)
-	fmt.Printf("========================================")
 	return &account.TxHashResponse{
 		Code: common2.ReturnCode_SUCCESS,
 		Msg:  "get transaction success",
