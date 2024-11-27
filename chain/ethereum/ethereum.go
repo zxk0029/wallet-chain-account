@@ -118,6 +118,7 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 			Msg:  "get latest block header fail",
 		}, nil
 	}
+
 	blockHead := &account.BlockHeader{
 		Hash:             blockInfo.Hash().String(),
 		ParentHash:       blockInfo.ParentHash.String(),
@@ -126,7 +127,7 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 		Root:             blockInfo.Root.String(),
 		TxHash:           blockInfo.TxHash.String(),
 		ReceiptHash:      blockInfo.ReceiptHash.String(),
-		ParentBeaconRoot: blockInfo.ParentBeaconRoot.String(),
+		ParentBeaconRoot: common.Hash{}.String(),
 		Difficulty:       blockInfo.Difficulty.String(),
 		Number:           blockInfo.Number.String(),
 		GasLimit:         blockInfo.GasLimit,
@@ -136,9 +137,9 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 		MixDigest:        blockInfo.MixDigest.String(),
 		Nonce:            strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
 		BaseFee:          blockInfo.BaseFee.String(),
-		WithdrawalsHash:  blockInfo.WithdrawalsHash.String(),
-		BlobGasUsed:      *blockInfo.BlobGasUsed,
-		ExcessBlobGas:    *blockInfo.ExcessBlobGas,
+		WithdrawalsHash:  common.Hash{}.String(),
+		BlobGasUsed:      0,
+		ExcessBlobGas:    0,
 	}
 	return &account.BlockHeaderResponse{
 		Code:        common2.ReturnCode_SUCCESS,
