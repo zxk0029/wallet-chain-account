@@ -78,3 +78,13 @@ wallet_node:
     data_api_key: 'DCIEZ5TQSFY88QUTHQBKYG92I828A44ZRN'
     data_api_token: ''
     time_out: 15
+
+  icp:
+    rpc_url: 'http://localhost:8081'
+    rpc_user: ''
+    rpc_pass: ''
+    data_api_url: ''
+    data_api_key: ''
+    data_api_token: ''
+    time_out: 15
+
