@@ -2,6 +2,7 @@ package ethereum
 
 import (
 	"context"
+	"github.com/dapplink-labs/wallet-chain-account/chain/erc20_base"
 	"math/big"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 
 func TestGetBalance(t *testing.T) {
 	url := "https://eth-holesky.g.alchemy.com/v2/BvSZ5ZfdIwB-5SDXMz8PfGcbICYQqwrl"
-	dialEthClient, _ := DialEthClient(context.Background(), url)
+	dialEthClient, _ := erc20_base.DialEthClient(context.Background(), url)
 
 	t.Run("Check Balance And Account Type", func(t *testing.T) {
 		// 2. 要检查的地址

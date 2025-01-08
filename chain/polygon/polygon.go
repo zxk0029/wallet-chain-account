@@ -1,4 +1,4 @@
-package ethereum
+package polygon
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	erc20_base2 "github.com/dapplink-labs/wallet-chain-account/chain/erc20_base"
 	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	erc20Base "github.com/dapplink-labs/wallet-chain-account/chain/erc20_base"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,19 +32,19 @@ import (
 	common2 "github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
 
-const ChainName = "Ethereum"
+const ChainName = "Polygon"
 
 type ChainAdaptor struct {
-	ethClient     erc20_base2.EthClient
-	ethDataClient *erc20_base2.EthData
+	ethClient     erc20Base.EthClient
+	ethDataClient *erc20Base.EthData
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
-	ethClient, err := erc20_base2.DialEthClient(context.Background(), conf.WalletNode.Eth.RpcUrl)
+	ethClient, err := erc20Base.DialEthClient(context.Background(), conf.WalletNode.Polygon.RpcUrl)
 	if err != nil {
 		return nil, err
 	}
-	ethDataClient, err := erc20_base2.NewEthDataClient(conf.WalletNode.Eth.DataApiUrl, conf.WalletNode.Eth.DataApiKey, time.Second*15)
+	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Polygon.DataApiUrl, conf.WalletNode.Polygon.DataApiKey, time.Second*15)
 	if err != nil {
 		return nil, err
 	}
@@ -157,31 +158,43 @@ func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest)
 			Msg:  "get latest block header fail",
 		}, nil
 	}
-	blockHeader := &account.BlockHeader{
-		Hash:             blockInfo.Hash().String(),
-		ParentHash:       blockInfo.ParentHash.String(),
-		UncleHash:        blockInfo.UncleHash.String(),
-		CoinBase:         blockInfo.Coinbase.String(),
-		Root:             blockInfo.Root.String(),
-		TxHash:           blockInfo.TxHash.String(),
-		ReceiptHash:      blockInfo.ReceiptHash.String(),
-		ParentBeaconRoot: blockInfo.ParentBeaconRoot.String(),
-		Difficulty:       blockInfo.Difficulty.String(),
-		Number:           blockInfo.Number.String(),
-		GasLimit:         blockInfo.GasLimit,
-		GasUsed:          blockInfo.GasUsed,
-		Time:             blockInfo.Time,
-		Extra:            string(blockInfo.Extra),
-		MixDigest:        blockInfo.MixDigest.String(),
-		Nonce:            strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
-		BaseFee:          blockInfo.BaseFee.String(),
-		WithdrawalsHash:  blockInfo.WithdrawalsHash.String(),
-		BlobGasUsed:      *blockInfo.BlobGasUsed,
-		ExcessBlobGas:    *blockInfo.ExcessBlobGas,
+
+	// 安全地获取 BaseFee
+	var baseFee string
+	if blockInfo.BaseFee != nil {
+		baseFee = blockInfo.BaseFee.String()
+	} else {
+		baseFee = "0"
 	}
+
+	blockHeader := &account.BlockHeader{
+		Hash:        blockInfo.Hash().String(),
+		ParentHash:  blockInfo.ParentHash.String(),
+		UncleHash:   blockInfo.UncleHash.String(),
+		CoinBase:    blockInfo.Coinbase.String(),
+		Root:        blockInfo.Root.String(),
+		TxHash:      blockInfo.TxHash.String(),
+		ReceiptHash: blockInfo.ReceiptHash.String(),
+		Difficulty:  blockInfo.Difficulty.String(),
+		Number:      blockInfo.Number.String(),
+		GasLimit:    blockInfo.GasLimit,
+		GasUsed:     blockInfo.GasUsed,
+		Time:        blockInfo.Time,
+		Extra:       hex.EncodeToString(blockInfo.Extra),
+		MixDigest:   blockInfo.MixDigest.String(),
+		Nonce:       strconv.FormatUint(blockInfo.Nonce.Uint64(), 10),
+		BaseFee:     baseFee,
+
+		// 安全地处理可能为 nil 的字段
+		ParentBeaconRoot: getSafeHashString(blockInfo.ParentBeaconRoot),
+		WithdrawalsHash:  getSafeHashString(blockInfo.WithdrawalsHash),
+		BlobGasUsed:      getSafeUint64Ptr(blockInfo.BlobGasUsed),
+		ExcessBlobGas:    getSafeUint64Ptr(blockInfo.ExcessBlobGas),
+	}
+
 	return &account.BlockHeaderResponse{
 		Code:        common2.ReturnCode_SUCCESS,
-		Msg:         "get latest block header success",
+		Msg:         "get block header success",
 		BlockHeader: blockHeader,
 	}, nil
 }
@@ -445,6 +458,7 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 	endBlock := new(big.Int)
 	startBlock.SetString(req.Start, 10)
 	endBlock.SetString(req.End, 10)
+
 	blockRange, err := c.ethClient.BlockHeadersByRange(startBlock, endBlock, 1)
 	if err != nil {
 		log.Error("get block range fail", "err", err)
@@ -453,31 +467,45 @@ func (c *ChainAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*accou
 			Msg:  "get block range fail",
 		}, err
 	}
+
 	blockHeaderList := make([]*account.BlockHeader, 0, len(blockRange))
 	for _, block := range blockRange {
-		blockItem := &account.BlockHeader{
-			ParentHash:       block.ParentHash.String(),
-			UncleHash:        block.UncleHash.String(),
-			CoinBase:         block.Coinbase.String(),
-			Root:             block.Root.String(),
-			TxHash:           block.TxHash.String(),
-			ReceiptHash:      block.ReceiptHash.String(),
-			ParentBeaconRoot: block.ParentBeaconRoot.String(),
-			Difficulty:       block.Difficulty.String(),
-			Number:           block.Number.String(),
-			GasLimit:         block.GasLimit,
-			GasUsed:          block.GasUsed,
-			Time:             block.Time,
-			Extra:            string(block.Extra),
-			MixDigest:        block.MixDigest.String(),
-			Nonce:            strconv.FormatUint(block.Nonce.Uint64(), 10),
-			BaseFee:          block.BaseFee.String(),
-			WithdrawalsHash:  block.WithdrawalsHash.String(),
-			BlobGasUsed:      *block.BlobGasUsed,
-			ExcessBlobGas:    *block.ExcessBlobGas,
+		// 安全地获取 BaseFee
+		var baseFee string
+		if block.BaseFee != nil {
+			baseFee = block.BaseFee.String()
+		} else {
+			baseFee = "0"
 		}
-		blockHeaderList = append(blockHeaderList, blockItem)
+
+		blockHeader := &account.BlockHeader{
+			Hash:        block.Hash().String(),
+			ParentHash:  block.ParentHash.String(),
+			UncleHash:   block.UncleHash.String(),
+			CoinBase:    block.Coinbase.String(),
+			Root:        block.Root.String(),
+			TxHash:      block.TxHash.String(),
+			ReceiptHash: block.ReceiptHash.String(),
+			Difficulty:  block.Difficulty.String(),
+			Number:      block.Number.String(),
+			GasLimit:    block.GasLimit,
+			GasUsed:     block.GasUsed,
+			Time:        block.Time,
+			Extra:       hex.EncodeToString(block.Extra),
+			MixDigest:   block.MixDigest.String(),
+			Nonce:       strconv.FormatUint(block.Nonce.Uint64(), 10),
+			BaseFee:     baseFee,
+
+			// 安全地处理可能为 nil 的字段
+			ParentBeaconRoot: getSafeHashString(block.ParentBeaconRoot),
+			WithdrawalsHash:  getSafeHashString(block.WithdrawalsHash),
+			BlobGasUsed:      getSafeUint64Ptr(block.BlobGasUsed),
+			ExcessBlobGas:    getSafeUint64Ptr(block.ExcessBlobGas),
+		}
+
+		blockHeaderList = append(blockHeaderList, blockHeader)
 	}
+
 	return &account.BlockByRangeResponse{
 		Code:        common2.ReturnCode_SUCCESS,
 		Msg:         "get block range success",
@@ -549,7 +577,7 @@ func (c *ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequ
 		return nil, fmt.Errorf("recover sender failed: %w", err)
 	}
 
-	if sender.Hex() != dynamicFeeTx.FromAddress {
+	if strings.ToLower(sender.Hex()) != strings.ToLower(dynamicFeeTx.FromAddress) {
 		log.Error("sender mismatch",
 			"expected", dynamicFeeTx.FromAddress,
 			"got", sender.Hex(),
@@ -593,7 +621,7 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 }
 
 // buildDynamicFeeTx 构建动态费用交易的公共方法
-func (c *ChainAdaptor) buildDynamicFeeTx(base64Tx string) (*types.DynamicFeeTx, *Eip1559DynamicFeeTx, error) {
+func (c *ChainAdaptor) buildDynamicFeeTx(base64Tx string) (*types.DynamicFeeTx, *Tx, error) {
 	// 1. Decode base64 string
 	txReqJsonByte, err := base64.StdEncoding.DecodeString(base64Tx)
 	if err != nil {
@@ -602,7 +630,7 @@ func (c *ChainAdaptor) buildDynamicFeeTx(base64Tx string) (*types.DynamicFeeTx, 
 	}
 
 	// 2. Unmarshal JSON to struct
-	var dynamicFeeTx Eip1559DynamicFeeTx
+	var dynamicFeeTx Tx
 	if err := json.Unmarshal(txReqJsonByte, &dynamicFeeTx); err != nil {
 		log.Error("parse json fail", "err", err)
 		return nil, nil, err
@@ -664,7 +692,7 @@ func (c *ChainAdaptor) buildDynamicFeeTx(base64Tx string) (*types.DynamicFeeTx, 
 }
 
 // 判断是否为 ETH 转账
-func isEthTransfer(tx *Eip1559DynamicFeeTx) bool {
+func isEthTransfer(tx *Tx) bool {
 	// 检查合约地址是否为空或零地址
 	if tx.ContractAddress == "" ||
 		tx.ContractAddress == "0x0000000000000000000000000000000000000000" ||
@@ -672,4 +700,28 @@ func isEthTransfer(tx *Eip1559DynamicFeeTx) bool {
 		return true
 	}
 	return false
+}
+
+func stringToInt(amount string) *big.Int {
+	log.Info("string to Int", "amount", amount)
+	intAmount, success := big.NewInt(0).SetString(amount, 0)
+	if !success {
+		return nil
+	}
+	return intAmount
+}
+
+func getSafeUint64Ptr(ptr *uint64) uint64 {
+	if ptr == nil {
+		return 0
+	}
+	return *ptr
+}
+
+// 添加辅助函数
+func getSafeHashString(hash *common.Hash) string {
+	if hash == nil {
+		return common.Hash{}.String()
+	}
+	return hash.String()
 }

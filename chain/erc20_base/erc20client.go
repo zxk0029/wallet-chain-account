@@ -1,4 +1,4 @@
-package ethereum
+package erc20_base
 
 import (
 	"context"

@@ -1,6 +1,7 @@
-package ethereum
+package polygon
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -42,6 +43,9 @@ func TestChainAdaptor_ConvertAddress(t *testing.T) {
 		Network:   "mainnet",
 		PublicKey: "048318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed753547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5",
 	})
+
+	log.Info("ChainName========", ChainName)
+
 	if err != nil {
 		log.Error("convert address failed:", err)
 		return
@@ -81,8 +85,9 @@ func TestChainAdaptor_GetBlockHeaderByNumber(t *testing.T) {
 	resp, err := adaptor.GetBlockHeaderByNumber(&account.BlockHeaderNumberRequest{
 		Chain:   ChainName,
 		Network: "mainnet",
-		Height:  21118661,
+		Height:  66444218,
 	})
+	log.Info("ChainName========", ChainName)
 	if err != nil {
 		log.Error("get block header by number failed:", err)
 		return
@@ -101,7 +106,7 @@ func TestChainAdaptor_GetBlockHeaderByHash(t *testing.T) {
 	resp, err := adaptor.GetBlockHeaderByHash(&account.BlockHeaderHashRequest{
 		Chain:   ChainName,
 		Network: "mainnet",
-		Hash:    "0x17933cce37211452df901718afd30e4fe013b67c0d262dffd2eb5a3f1b091431",
+		Hash:    "0xbd56b33a34ce67fa1bee83da0c0135f16af5296b2d6ff97750f76f52c67eceb6",
 	})
 	if err != nil {
 		log.Error("get block header by hash failed:", err)
@@ -161,7 +166,7 @@ func TestChainAdaptor_GetAccount(t *testing.T) {
 	resp, err := adaptor.GetAccount(&account.AccountRequest{
 		Chain:           ChainName,
 		Network:         "mainnet",
-		Address:         "0xD79053a14BC465d9C1434d4A4fAbdeA7b6a2A94b",
+		Address:         "0x67B94473D81D0cd00849D563C94d0432Ac988B49",
 		ContractAddress: "0x00",
 	})
 	if err != nil {
@@ -191,6 +196,7 @@ func TestChainAdaptor_GetFee(t *testing.T) {
 	respJson, _ := json.Marshal(resp)
 	t.Logf("响应: %s", respJson)
 }
+
 func TestChainAdaptor_GetTxByAddress(t *testing.T) {
 	adaptor, err := setup()
 	if err != nil {
@@ -199,8 +205,9 @@ func TestChainAdaptor_GetTxByAddress(t *testing.T) {
 	resp, err := adaptor.GetTxByAddress(&account.TxAddressRequest{
 		Chain:   ChainName,
 		Network: "mainnet",
-		Address: "0xD79053a14BC465d9C1434d4A4fAbdeA7b6a2A94b",
+		Address: "0x8916B42a4DB16CA71080dBB0f3650162Ad1E7e3e",
 	})
+	log.Info("ChainName========", ChainName)
 	if err != nil {
 		t.Error("get transaction by address failed:", err)
 		return
@@ -216,8 +223,9 @@ func TestChainAdaptor_GetTxByHash(t *testing.T) {
 	resp, err := adaptor.GetTxByHash(&account.TxHashRequest{
 		Chain:   ChainName,
 		Network: "mainnet",
-		Hash:    "0xa35cdf2fc94521b344ea02591eda0b767be2fc8620bb4ed8adabba49fcc0c89a",
+		Hash:    "0xc1ecf1f5412b5130f08070cebe83ff83e360c76a7df9ea6e397eb473c3da3282",
 	})
+	log.Info("ChainName========", ChainName)
 	if err != nil {
 		t.Error("get transaction by address failed:", err)
 		return
@@ -233,8 +241,8 @@ func TestChainAdaptor_GetBlockByRange(t *testing.T) {
 	resp, err := adaptor.GetBlockByRange(&account.BlockByRangeRequest{
 		Chain:   ChainName,
 		Network: "mainnet",
-		Start:   "21118661",
-		End:     "21118662",
+		Start:   "66444215",
+		End:     "66444218",
 	})
 	if err != nil {
 		t.Error("get block by range failed:", err)
@@ -242,4 +250,108 @@ func TestChainAdaptor_GetBlockByRange(t *testing.T) {
 	}
 	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
 	fmt.Println(resp.GetBlockHeader())
+}
+
+func createTestBase64Tx() string {
+
+	testTx := Tx{
+		Nonce:                10,
+		FromAddress:          "0x67936bb11f8fd1d25da1f94e0aa51039409a7c97",
+		ToAddress:            "0x85606bfea925e96285583fabadfcf9cb25bd6721",
+		Amount:               "10000000000000000000",
+		MaxPriorityFeePerGas: "36819559040",
+		MaxFeePerGas:         "36819559041",
+		Gas:                  2100,
+		GasLimit:             21000,
+		ChainId:              "137",
+		ContractAddress:      "0x00",
+		Signature:            "4f2f529b50b02d1f5b6bb14817cc1708943c2660d7938996b849f0ab3f186e0f6df57918924d23fe54c15602467d38c665aaabb2e54e877aa0452afc74983cd101",
+	}
+
+	jsonBytes, err := json.Marshal(testTx)
+	if err != nil {
+		panic(err)
+	}
+
+	base64Str := base64.StdEncoding.EncodeToString(jsonBytes)
+	return base64Str
+}
+func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
+	adaptor, err := setup()
+	if err != nil {
+		return
+	}
+
+	resp, err := adaptor.CreateUnSignTransaction(&account.UnSignTransactionRequest{
+		Chain:    ChainName,
+		Network:  "mainnet",
+		Base64Tx: createTestBase64Tx(),
+	})
+	if err != nil {
+		log.Error("CreateUnSignTransaction failed:", err)
+		return
+	}
+
+	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+	fmt.Println(resp.UnSignTx)
+}
+
+// 4f2f529b50b02d1f5b6bb14817cc1708943c2660d7938996b849f0ab3f186e0f6df57918924d23fe54c15602467d38c665aaabb2e54e877aa0452afc74983cd101
+func TestChainAdaptor_BuildSignedTransaction(t *testing.T) {
+	adaptor, err := setup()
+	if err != nil {
+		return
+	}
+
+	resp, err := adaptor.BuildSignedTransaction(&account.SignedTransactionRequest{
+		Chain:     ChainName,
+		Network:   "mainnet",
+		Base64Tx:  createTestBase64Tx(),
+		Signature: "0b8ea64c3d7cf8cb0008379afb7a1c79da73d92260ef3a374cefb3f5ae152a6339bac0e1eb80e86836db4fc444ba37ff9c4efb0368e95e16fc5439d8214c98fd00",
+	})
+	if err != nil {
+		log.Error("TestChainAdaptor_BuildSignedTransaction failed:", err)
+		return
+	}
+
+	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+	fmt.Println(resp.SignedTx)
+}
+
+func TestChainAdaptor_SendTx(t *testing.T) {
+	adaptor, err := setup()
+	if err != nil {
+		return
+	}
+	RawTx := "0x02f87581890a8508929de2808508929de2818252089485606bfea925e96285583fabadfcf9cb25bd6721888ac7230489e8000080c080a00b8ea64c3d7cf8cb0008379afb7a1c79da73d92260ef3a374cefb3f5ae152a63a039bac0e1eb80e86836db4fc444ba37ff9c4efb0368e95e16fc5439d8214c98fd"
+	log.Info("1:", RawTx)
+	resp, err := adaptor.SendTx(&account.SendTxRequest{
+		Chain:   ChainName,
+		Network: "mainnet",
+		RawTx:   RawTx,
+	})
+	if err != nil {
+		log.Error("TestChainAdaptor_SendTx failed:", err)
+		return
+	}
+	log.Info(resp.TxHash)
+	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
+}
+func TestChainAdaptor_VerifySignedTransaction(t *testing.T) {
+	adaptor, err := setup()
+	if err != nil {
+		return
+	}
+
+	resp, err := adaptor.VerifySignedTransaction(&account.VerifyTransactionRequest{
+		Chain:     ChainName,
+		Network:   "mainnet",
+		Signature: "0x02f8738189808508929de2808508929de281809485606bfea925e96285583fabadfcf9cb25bd6721888ac7230489e8000080c001a04f2f529b50b02d1f5b6bb14817cc1708943c2660d7938996b849f0ab3f186e0fa06df57918924d23fe54c15602467d38c665aaabb2e54e877aa0452afc74983cd1",
+	})
+	if err != nil {
+		log.Error("TestChainAdaptor_VerifySignedTransaction failed:", err)
+		return
+	}
+
+	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
 }
