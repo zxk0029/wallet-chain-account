@@ -1,4 +1,4 @@
-FROM golang:1.22.7-bookworm as builder
+FROM golang:1.22.7-alpine as builder
 
 RUN apk add --no-cache make ca-certificates gcc musl-dev linux-headers git jq bash
 
