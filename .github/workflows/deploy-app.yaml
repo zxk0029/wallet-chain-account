@@ -30,11 +30,11 @@ jobs:
           echo "::set-output name=commit_sha::$(git rev-parse --short=7 HEAD)"
       - name: deploy app
         run: |
-          registry="registry-intl-vpc.us-west-1.aliyuncs.com"
-          namespace="fishcake-lab"
+          registry="hkccr.ccs.tencentyun.com"
+          namespace="dapplink"
           appname="wallet-chain-account"
           tag_name="${registry}/${namespace}/${appname}"
-          docker login --username=info@fishcake.io -p fishcake@go registry-intl-vpc.us-west-1.aliyuncs.com
+          docker login --username=100003588471 -p dapplink@go hkccr.ccs.tencentyun.com
           docker build --pull  -t ${tag_name}:v0.0.1 .
           docker push ${tag_name}:v0.0.1
           

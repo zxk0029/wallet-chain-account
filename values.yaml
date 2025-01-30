@@ -7,7 +7,7 @@ image:
   tag: ""
 
 imagePullSecrets:
-  - name: fishcake
+  - name: dapplink
 nameOverride: ""
 fullnameOverride: ""
 
