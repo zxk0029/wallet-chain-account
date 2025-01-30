@@ -1,4 +1,4 @@
-package erc20_base
+package evmbase
 
 import (
 	"time"

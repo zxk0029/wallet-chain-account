@@ -37,7 +37,7 @@ type WalletNode struct {
 	Aptos   Node `yaml:"aptos"`
 	Mantle  Node `yaml:"mantle"`
 	Scroll  Node `yaml:"scroll"`
-	Base    Node `yaml:"erc20_base"`
+	Base    Node `yaml:"evmbase"`
 	Linea   Node `yaml:"linea"`
 	Sui     Node `yaml:"sui"`
 	Ton     Node `yaml:"ton"`

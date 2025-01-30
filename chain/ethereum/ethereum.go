@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	erc20_base2 "github.com/dapplink-labs/wallet-chain-account/chain/erc20_base"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -25,6 +24,7 @@ import (
 
 	account2 "github.com/dapplink-labs/chain-explorer-api/common/account"
 	"github.com/dapplink-labs/wallet-chain-account/chain"
+	erc20_base2 "github.com/dapplink-labs/wallet-chain-account/chain/evmbase"
 	"github.com/dapplink-labs/wallet-chain-account/common/util"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
