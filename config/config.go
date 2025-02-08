@@ -70,5 +70,5 @@ func New(path string) (*Config, error) {
 	return config, nil
 }
 
-const UnsupportedChain = "Unsupport chain"
+const UnsupportedChain = "unsupported chain"
 const UnsupportedOperation = UnsupportedChain
