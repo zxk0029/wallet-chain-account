@@ -39,10 +39,12 @@ type ChainAdaptor struct {
 }
 
 func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
+	// 创建基础客户端
 	ethClient, err := erc20_base2.DialEthClient(context.Background(), conf.WalletNode.Eth.RpcUrl)
 	if err != nil {
 		return nil, err
 	}
+	// 创建数据API客户端
 	ethDataClient, err := erc20_base2.NewEthDataClient(conf.WalletNode.Eth.DataApiUrl, conf.WalletNode.Eth.DataApiKey, time.Second*15)
 	if err != nil {
 		return nil, err
@@ -248,14 +250,16 @@ func (c *ChainAdaptor) GetBlockByHash(req *account.BlockHashRequest) (*account.B
 }
 
 func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.AccountResponse, error) {
+	// 获取nonce
 	nonceResult, err := c.ethClient.TxCountByAddress(common.HexToAddress(req.Address))
 	if err != nil {
-		log.Error("get nonce by address fail", "err", err)
+		log.Error("get nonce by address fail", "address", req.Address, "err", err)
 		return &account.AccountResponse{
 			Code: common2.ReturnCode_ERROR,
 			Msg:  "get nonce by address fail",
 		}, nil
 	}
+	// 获取余额
 	balanceResult, err := c.ethDataClient.GetBalanceByAddress(req.ContractAddress, req.Address)
 	if err != nil {
 		return &account.AccountResponse{
@@ -266,6 +270,7 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 	}
 	log.Info("balance result", "balance=", balanceResult.Balance, "balanceStr=", balanceResult.BalanceStr)
 
+	// 转换余额格式
 	balanceStr := "0"
 	if balanceResult.Balance != nil && balanceResult.Balance.Int() != nil {
 		balanceStr = balanceResult.Balance.Int().String()
@@ -282,6 +287,7 @@ func (c *ChainAdaptor) GetAccount(req *account.AccountRequest) (*account.Account
 }
 
 func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, error) {
+	// 获取建议Gas价格
 	gasPrice, err := c.ethClient.SuggestGasPrice()
 	if err != nil {
 		log.Error("get gas price failed", "err", err)
@@ -290,6 +296,7 @@ func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, er
 			Msg:  "get suggest gas price fail",
 		}, nil
 	}
+	// 获取建议GasTip价格
 	gasTipCap, err := c.ethClient.SuggestGasTipCap()
 	if err != nil {
 		log.Error("get gas price failed", "err", err)
@@ -308,6 +315,7 @@ func (c *ChainAdaptor) GetFee(req *account.FeeRequest) (*account.FeeResponse, er
 }
 
 func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxResponse, error) {
+	// 解析原始交易数据
 	transaction, err := c.ethClient.SendRawTransaction(req.RawTx)
 	if err != nil {
 		return &account.SendTxResponse{

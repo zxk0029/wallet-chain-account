@@ -1,0 +1,19 @@
+@startuml
+title 以太坊账户查询流程
+
+participant 客户端 as Client
+participant 调度器 as Dispatcher
+participant 以太坊适配器 as EthAdaptor
+participant Geth节点 as Geth
+
+Client -> Dispatcher: GetAccount请求\n(chain=ethereum)
+Dispatcher -> EthAdaptor: 路由请求
+EthAdaptor -> Geth: eth_getTransactionCount\n(获取nonce)
+Geth --> EthAdaptor: nonce值
+EthAdaptor -> Geth: eth_getBalance\n(获取余额)
+Geth --> EthAdaptor: 余额数据
+EthAdaptor --> Dispatcher: 组装响应
+Dispatcher --> Client: 返回账户信息\n(nonce + balance)
+
+note right of EthAdaptor: 步骤说明\n1. 验证链支持\n2. 调用底层客户端\n3. 处理节点响应
+@enduml

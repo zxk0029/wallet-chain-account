@@ -1,0 +1,24 @@
+@startuml
+class ChainDispatcher {
+  - registry: map[string]IChainAdaptor
+  + New()
+  + GetAccount()
+  + SendTx()
+}
+
+interface IChainAdaptor {
+  + GetAccount()
+  + SendTx()
+  + GetBlockByNumber()
+}
+
+class EthereumAdaptor {
+  - ethClient: EthClient
+  - ethDataClient: EthData
+  + GetAccount()
+  + SendTx()
+}
+
+ChainDispatcher o-- IChainAdaptor
+IChainAdaptor <|.. EthereumAdaptor
+@enduml

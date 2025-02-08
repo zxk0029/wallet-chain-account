@@ -1,0 +1,34 @@
+@startuml
+actor Client
+participant Interceptor
+participant Handler
+participant ChainDispatcher
+participant Adapter
+
+Client -> Interceptor: 发起gRPC请求
+activate Interceptor
+
+Interceptor -> Interceptor: 1. 记录请求日志
+Interceptor -> Interceptor: 2. 捕获panic
+Interceptor -> Handler: 调用实际处理方法
+activate Handler
+
+Handler -> ChainDispatcher: 执行业务逻辑
+activate ChainDispatcher
+
+ChainDispatcher -> Adapter: 路由到具体链
+activate Adapter
+
+Adapter --> ChainDispatcher: 返回结果
+deactivate Adapter
+
+ChainDispatcher --> Handler: 返回结果
+deactivate ChainDispatcher
+
+Handler --> Interceptor: 返回结果
+deactivate Handler
+
+Interceptor -> Interceptor: 3. 记录响应日志
+Interceptor --> Client: 返回最终响应
+deactivate Interceptor
+@enduml
