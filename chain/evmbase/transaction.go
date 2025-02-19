@@ -1,4 +1,4 @@
-package ethereum
+package evmbase
 
 import (
 	"encoding/hex"
