@@ -88,7 +88,7 @@ wallet_node:
     time_out: 60
 
   polygon:
-    rpc_url: 'https://polygon-mainnet.g.alchemy.com/v2/6n_grnrgB6CFk85lW1ex_bJyakWs2uw1'
+    rpc_url: 'https://rpc.ankr.com/polygon/0bd11fc050b965ffb96f31d7c9dda12d44752d64d5feb34065301564b636a76f'
     rpc_user: ''
     rpc_pass: ''
     data_api_url: 'https://api.polygonscan.com/api?'
