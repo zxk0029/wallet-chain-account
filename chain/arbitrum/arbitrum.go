@@ -43,7 +43,7 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	if err != nil {
 		return nil, err
 	}
-	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Arbi.DataApiUrl, conf.WalletNode.Arbi.DataApiKey, time.Duration(conf.WalletNode.Arbi.TimeOut))
+	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Arbi.DataApiUrl, conf.WalletNode.Arbi.DataApiKey, time.Second*20)
 	if err != nil {
 		return nil, err
 	}
