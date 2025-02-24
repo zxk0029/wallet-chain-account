@@ -43,7 +43,7 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	if err != nil {
 		return nil, err
 	}
-	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Arbi.DataApiUrl, conf.WalletNode.Arbi.DataApiKey, time.Duration(conf.WalletNode.Arbi.TimeOut))
+	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Arbi.DataApiUrl, conf.WalletNode.Arbi.DataApiKey, time.Second*20)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 				Hash:            txs[i].TxId,
 				Tos:             []*account.Address{{Address: txs[i].To}},
 				Froms:           []*account.Address{{Address: txs[i].From}},
-				Fee:             txs[i].TxId,
+				Fee:             txs[i].TxFee,
 				Status:          account.TxStatus_Success,
 				Values:          []*account.Value{{Value: txs[i].Amount}},
 				Type:            1,
