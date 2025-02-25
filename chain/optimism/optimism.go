@@ -43,7 +43,7 @@ func NewChainAdaptor(conf *config.Config) (chain.IChainAdaptor, error) {
 	if err != nil {
 		return nil, err
 	}
-	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Op.DataApiUrl, conf.WalletNode.Op.DataApiKey, time.Duration(conf.WalletNode.Op.TimeOut))
+	ethDataClient, err := erc20Base.NewEthDataClient(conf.WalletNode.Op.DataApiUrl, conf.WalletNode.Op.DataApiKey, time.Second*20)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (c *ChainAdaptor) GetBlockHeaderByHash(req *account.BlockHeaderHashRequest)
 		GasLimit:    rsp.GasLimit,
 		GasUsed:     rsp.GasUsed,
 		Time:        rsp.Time,
-		Extra:       string(rsp.Extra),
+		Extra:       base64.StdEncoding.EncodeToString(rsp.Extra),
 		MixDigest:   rsp.MixDigest.String(),
 		Nonce:       strconv.FormatUint(rsp.Nonce.Uint64(), 10),
 		BaseFee:     rsp.BaseFee.String(),

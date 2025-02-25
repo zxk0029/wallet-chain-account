@@ -360,7 +360,7 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 				Hash:   txs[i].TxId,
 				Tos:    []*account.Address{{Address: txs[i].To}},
 				Froms:  []*account.Address{{Address: txs[i].From}},
-				Fee:    txs[i].TxId,
+				Fee:    txs[i].TxFee,
 				Status: account.TxStatus_Success,
 				Values: []*account.Value{{Value: txs[i].Amount}},
 				Type:   1,
