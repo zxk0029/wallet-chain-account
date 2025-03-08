@@ -200,7 +200,7 @@ func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
 	fmt.Println("json: ", base64Encoded)
 	// eyJhZGRyRnJvbSI6IkdEWURJMzRZWlFDUDdXVTcyNkI2MjZLVEpJRTZDT1BTWE1XTDJWTFI3S05SSE1OQjZITE5GVUpCIiwiYWRkclRvIjoiR0Q2QVJHTVlUNjVVVUM3RlFEQks3N0dYTUVPTkw0NEJMN0U1RzRXTDJORFdNSjdOU1dCVUJZUVEiLCJzZXF1ZW5jZUZyb20iOjIzOTc2MzM4MzkwODMwMjg1MywiYW1vdW50IjoiMC4xMjMifQ==
 
-	rsp, err := adaptor.CreateUnSignTransaction(&account.UnSignTransactionRequest{
+	rsp, err := adaptor.BuildUnSignTransaction(&account.UnSignTransactionRequest{
 		Chain:    ChainName,
 		Network:  "mainnet",
 		Base64Tx: base64Encoded,

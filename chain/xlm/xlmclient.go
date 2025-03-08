@@ -5,17 +5,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/dapplink-labs/wallet-chain-account/config"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
-	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
-	"github.com/stellar/go/network"
-	"github.com/stellar/go/strkey"
-	"github.com/stellar/go/txnbuild"
 	"io"
 	"log"
 	"math/big"
 	"net/http"
 	"strconv"
+
+	"github.com/stellar/go/network"
+	"github.com/stellar/go/strkey"
+	"github.com/stellar/go/txnbuild"
+
+	"github.com/dapplink-labs/wallet-chain-account/config"
+	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
+	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
 )
 
 type XlmClient struct {
@@ -261,11 +263,6 @@ func (xc *XlmClient) GetTransactionByHash(txHash string) (*account.TxHashRespons
 		}, nil
 	}
 
-	////测试打印原始Response
-	//jsExpression, _ := json.MarshalIndent(resultEffect, "", "    ")
-	//fmt.Println("Print Origin Json")
-	//fmt.Println(string(jsExpression))
-
 	if len(resultEffect.Embedded.Records) != 2 {
 		log.Fatalf("Failed to HttpProcess: %v", err)
 		return &account.TxHashResponse{
@@ -273,17 +270,6 @@ func (xc *XlmClient) GetTransactionByHash(txHash string) (*account.TxHashRespons
 			Msg:  "GetTransactionByHash Failed [resultEffect.Embedded.Records] length != 2",
 		}, nil
 	}
-
-	var fromAddrs []*account.Address
-	fromAddrs = append(fromAddrs, &account.Address{Address: resultEffect.Embedded.Records[1].Account})
-
-	var toAddrs []*account.Address
-	toAddrs = append(toAddrs, &account.Address{Address: resultEffect.Embedded.Records[0].Account})
-
-	var valueList []*account.Value
-	var respAmount = resultEffect.Embedded.Records[0].Amount
-	valueList = append(valueList, &account.Value{Value: respAmount})
-
 	var txStatus account.TxStatus
 	if resultPart01.Successful {
 		txStatus = account.TxStatus_Success
@@ -296,9 +282,9 @@ func (xc *XlmClient) GetTransactionByHash(txHash string) (*account.TxHashRespons
 	tx := &account.TxMessage{
 		Hash:            resultPart01.Hash,
 		Index:           uint32(txID),
-		Froms:           fromAddrs,
-		Tos:             toAddrs,
-		Values:          valueList,
+		From:            resultEffect.Embedded.Records[1].Account,
+		To:              resultEffect.Embedded.Records[0].Account,
+		Value:           resultEffect.Embedded.Records[0].Amount,
 		Fee:             resultPart01.FeeCharged,
 		Status:          txStatus,
 		Type:            0,

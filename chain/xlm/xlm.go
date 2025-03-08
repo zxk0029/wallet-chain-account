@@ -159,7 +159,7 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 	return resp, err
 }
 
-func (c *ChainAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
 	resp, err := c.xlmClient.CreateUnsignTransaction(req)
 	if err != nil {
 		log.Error("CreateUnSignTransaction fail:", err)
@@ -205,4 +205,9 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 		Msg:   "Do not support this api",
 		Value: req.Chain,
 	}, nil
+}
+
+func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	//TODO implement me
+	panic("implement me")
 }

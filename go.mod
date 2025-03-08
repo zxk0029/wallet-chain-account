@@ -162,8 +162,6 @@ require (
 require (
 	cosmossdk.io/math v1.3.0
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/coinbase/rosetta-sdk-go v0.8.8
-	github.com/coinbase/rosetta-sdk-go/types v1.0.0
 	github.com/cometbft/cometbft v0.38.13
 	github.com/cosmos/btcutil v1.0.5
 	github.com/gagliardetto/solana-go v1.11.0
@@ -171,7 +169,10 @@ require (
 	github.com/test-go/testify v1.1.4
 )
 
-require github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
+require (
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
+	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2 // indirect
+)
 
 require (
 	cosmossdk.io/collections v0.4.0 // indirect
