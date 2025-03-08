@@ -920,6 +920,10 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 	return response, nil
 }
 
+func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
 func CalculateGasFee(gasUnitPrice, totalChargeGasUnits, storageFeeOctas, storageRefundOctas uint64) uint64 {
 	// calc base gas fee
 	gasFee := gasUnitPrice * totalChargeGasUnits

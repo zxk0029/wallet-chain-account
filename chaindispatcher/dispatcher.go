@@ -43,30 +43,6 @@ type ChainDispatcher struct {
 	registry map[ChainType]chain.IChainAdaptor
 }
 
-func (d *ChainDispatcher) GetNftListByAddress(ctx context.Context, request *account.NftAddressRequest) (*account.NftAddressResponse, error) {
-	panic("implement me")
-}
-
-func (d *ChainDispatcher) GetNftCollection(ctx context.Context, request *account.NftCollectionRequest) (*account.NftCollectionResponse, error) {
-	panic("implement me")
-}
-
-func (d *ChainDispatcher) GetNftDetail(ctx context.Context, request *account.NftDetailRequest) (*account.NftDetailResponse, error) {
-	panic("implement me")
-}
-
-func (d *ChainDispatcher) GetNftHolderList(ctx context.Context, request *account.NftHolderListRequest) (*account.NftHolderListResponse, error) {
-	panic("implement me")
-}
-
-func (d *ChainDispatcher) GetNftTradeHistory(ctx context.Context, request *account.NftTradeHistoryRequest) (*account.NftTradeHistoryResponse, error) {
-	panic("implement me")
-}
-
-func (d *ChainDispatcher) GetAddressNftTradeHistory(ctx context.Context, request *account.AddressNftTradeHistoryRequest) (*account.AddressNftTradeHistoryResponse, error) {
-	panic("implement me")
-}
-
 func New(conf *config.Config) (*ChainDispatcher, error) {
 	dispatcher := ChainDispatcher{
 		registry: make(map[ChainType]chain.IChainAdaptor),
@@ -361,4 +337,28 @@ func (d *ChainDispatcher) GetExtraData(ctx context.Context, request *account.Ext
 		}, nil
 	}
 	return d.registry[request.Chain].GetExtraData(request)
+}
+
+func (d *ChainDispatcher) GetNftListByAddress(ctx context.Context, request *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftCollection(ctx context.Context, request *account.NftCollectionRequest) (*account.NftCollectionResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftDetail(ctx context.Context, request *account.NftDetailRequest) (*account.NftDetailResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftHolderList(ctx context.Context, request *account.NftHolderListRequest) (*account.NftHolderListResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftTradeHistory(ctx context.Context, request *account.NftTradeHistoryRequest) (*account.NftTradeHistoryResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetAddressNftTradeHistory(ctx context.Context, request *account.AddressNftTradeHistoryRequest) (*account.AddressNftTradeHistoryResponse, error) {
+	panic("implement me")
 }

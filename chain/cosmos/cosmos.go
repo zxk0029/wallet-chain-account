@@ -490,6 +490,10 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 	}, nil
 }
 
+func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
 func (c *ChainAdaptor) parseTx(txs types.Txs) (uint64, []*account.BlockInfoTransactionList) {
 	totalGas := uint64(0)
 	var recipient, sender, amount = "", "", ""

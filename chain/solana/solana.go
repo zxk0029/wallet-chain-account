@@ -1042,6 +1042,11 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 	//TODO implement me
 	panic("implement me")
 }
+
+func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
 func isSOLTransfer(coinAddress string) bool {
 
 	return coinAddress == "" ||

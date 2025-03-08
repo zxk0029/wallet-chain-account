@@ -281,6 +281,10 @@ func (s *SuiAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Extra
 	panic("implement me")
 }
 
+func (c *SuiAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
 func stringToInt(amount string) *big.Int {
 	log.Info("string to Int", "amount", amount)
 	intAmount, success := big.NewInt(0).SetString(amount, 0)

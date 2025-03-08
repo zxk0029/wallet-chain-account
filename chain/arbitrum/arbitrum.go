@@ -608,6 +608,10 @@ func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.Ext
 	}, nil
 }
 
+func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
 func getSafeUint64Ptr(ptr *uint64) uint64 {
 	if ptr == nil {
 		return 0
