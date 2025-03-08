@@ -26,6 +26,7 @@ import (
 	"github.com/dapplink-labs/wallet-chain-account/chain/sui"
 	"github.com/dapplink-labs/wallet-chain-account/chain/ton"
 	"github.com/dapplink-labs/wallet-chain-account/chain/tron"
+	"github.com/dapplink-labs/wallet-chain-account/chain/xlm"
 	"github.com/dapplink-labs/wallet-chain-account/config"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/account"
 	"github.com/dapplink-labs/wallet-chain-account/rpc/common"
@@ -63,6 +64,7 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		optimism.ChainName: optimism.NewChainAdaptor,
 		linea.ChainName:    linea.NewChainAdaptor,
 		scroll.ChainName:   scroll.NewChainAdaptor,
+		xlm.ChainName:      xlm.NewChainAdaptor,
 		btt.ChainName:      btt.NewChainAdaptor,
 	}
 
@@ -81,6 +83,7 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		optimism.ChainName,
 		linea.ChainName,
 		scroll.ChainName,
+		xlm.ChainName,
 		btt.ChainName,
 	}
 
@@ -120,6 +123,7 @@ func (d *ChainDispatcher) Interceptor(ctx context.Context, req interface{}, info
 
 func (d *ChainDispatcher) preHandler(req interface{}) (resp *CommonReply) {
 	chainName := req.(CommonRequest).GetChain()
+	log.Debug("chain", chainName, "req", req)
 	if _, ok := d.registry[chainName]; !ok {
 		return &CommonReply{
 			Code:    common.ReturnCode_ERROR,
