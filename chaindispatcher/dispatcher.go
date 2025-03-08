@@ -2,7 +2,14 @@ package chaindispatcher
 
 import (
 	"context"
+	"github.com/dapplink-labs/wallet-chain-account/chain/arbitrum"
+	"github.com/dapplink-labs/wallet-chain-account/chain/binance"
+	"github.com/dapplink-labs/wallet-chain-account/chain/btt"
+	"github.com/dapplink-labs/wallet-chain-account/chain/linea"
+	"github.com/dapplink-labs/wallet-chain-account/chain/mantle"
+	"github.com/dapplink-labs/wallet-chain-account/chain/optimism"
 	"github.com/dapplink-labs/wallet-chain-account/chain/polygon"
+	"github.com/dapplink-labs/wallet-chain-account/chain/scroll"
 	"runtime/debug"
 	"strings"
 
@@ -36,6 +43,30 @@ type ChainDispatcher struct {
 	registry map[ChainType]chain.IChainAdaptor
 }
 
+func (d *ChainDispatcher) GetNftListByAddress(ctx context.Context, request *account.NftAddressRequest) (*account.NftAddressResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftCollection(ctx context.Context, request *account.NftCollectionRequest) (*account.NftCollectionResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftDetail(ctx context.Context, request *account.NftDetailRequest) (*account.NftDetailResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftHolderList(ctx context.Context, request *account.NftHolderListRequest) (*account.NftHolderListResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetNftTradeHistory(ctx context.Context, request *account.NftTradeHistoryRequest) (*account.NftTradeHistoryResponse, error) {
+	panic("implement me")
+}
+
+func (d *ChainDispatcher) GetAddressNftTradeHistory(ctx context.Context, request *account.AddressNftTradeHistoryRequest) (*account.AddressNftTradeHistoryResponse, error) {
+	panic("implement me")
+}
+
 func New(conf *config.Config) (*ChainDispatcher, error) {
 	dispatcher := ChainDispatcher{
 		registry: make(map[ChainType]chain.IChainAdaptor),
@@ -50,6 +81,13 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		sui.ChainName:      sui.NewSuiAdaptor,
 		ton.ChainName:      ton.NewChainAdaptor,
 		polygon.ChainName:  polygon.NewChainAdaptor,
+		arbitrum.ChainName: arbitrum.NewChainAdaptor,
+		binance.ChainName:  binance.NewChainAdaptor,
+		mantle.ChainName:   mantle.NewChainAdaptor,
+		optimism.ChainName: optimism.NewChainAdaptor,
+		linea.ChainName:    linea.NewChainAdaptor,
+		scroll.ChainName:   scroll.NewChainAdaptor,
+		btt.ChainName:      btt.NewChainAdaptor,
 	}
 
 	supportedChains := []string{
@@ -61,6 +99,13 @@ func New(conf *config.Config) (*ChainDispatcher, error) {
 		ton.ChainName,
 		aptos.ChainName,
 		polygon.ChainName,
+		arbitrum.ChainName,
+		binance.ChainName,
+		mantle.ChainName,
+		optimism.ChainName,
+		linea.ChainName,
+		scroll.ChainName,
+		btt.ChainName,
 	}
 
 	for _, c := range conf.Chains {
@@ -263,7 +308,7 @@ func (d *ChainDispatcher) GetBlockByRange(ctx context.Context, request *account.
 	return d.registry[request.Chain].GetBlockByRange(request)
 }
 
-func (d *ChainDispatcher) CreateUnSignTransaction(ctx context.Context, request *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+func (d *ChainDispatcher) BuildUnSignTransaction(ctx context.Context, request *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
 	resp := d.preHandler(request)
 	if resp != nil {
 		return &account.UnSignTransactionResponse{
@@ -271,7 +316,7 @@ func (d *ChainDispatcher) CreateUnSignTransaction(ctx context.Context, request *
 			Msg:  "get un sign tx fail at pre handle",
 		}, nil
 	}
-	return d.registry[request.Chain].CreateUnSignTransaction(request)
+	return d.registry[request.Chain].BuildUnSignTransaction(request)
 }
 
 func (d *ChainDispatcher) BuildSignedTransaction(ctx context.Context, request *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {

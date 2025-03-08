@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/dapplink-labs/wallet-chain-account/chain/evmbase"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -254,7 +255,7 @@ func TestChainAdaptor_GetBlockByRange(t *testing.T) {
 
 func createTestBase64Tx() string {
 
-	testTx := Tx{
+	testTx := evmbase.Eip1559DynamicFeeTx{
 		Nonce:                10,
 		FromAddress:          "0x67936bb11f8fd1d25da1f94e0aa51039409a7c97",
 		ToAddress:            "0x85606bfea925e96285583fabadfcf9cb25bd6721",
@@ -276,19 +277,19 @@ func createTestBase64Tx() string {
 	base64Str := base64.StdEncoding.EncodeToString(jsonBytes)
 	return base64Str
 }
-func TestChainAdaptor_CreateUnSignTransaction(t *testing.T) {
+func TestChainAdaptor_BuildUnSignTransaction(t *testing.T) {
 	adaptor, err := setup()
 	if err != nil {
 		return
 	}
 
-	resp, err := adaptor.CreateUnSignTransaction(&account.UnSignTransactionRequest{
+	resp, err := adaptor.BuildUnSignTransaction(&account.UnSignTransactionRequest{
 		Chain:    ChainName,
 		Network:  "mainnet",
 		Base64Tx: createTestBase64Tx(),
 	})
 	if err != nil {
-		log.Error("CreateUnSignTransaction failed:", err)
+		log.Error("BuildUnSignTransaction failed:", err)
 		return
 	}
 

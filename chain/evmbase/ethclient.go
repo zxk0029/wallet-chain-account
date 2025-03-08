@@ -35,9 +35,13 @@ type TransactionList struct {
 
 type RpcBlock struct {
 	Hash         common.Hash       `json:"hash"`
-	Height       uint64            `json:"height"`
+	Number       string            `json:"number"`
 	Transactions []TransactionList `json:"transactions"`
 	BaseFee      string            `json:"baseFeePerGas"`
+}
+
+func (b *RpcBlock) NumberUint64() (uint64, error) {
+	return hexutil.DecodeUint64(b.Number)
 }
 
 type clnt struct {
@@ -352,7 +356,7 @@ func (c *clnt) EthGetCode(account common.Address) (string, error) {
 	defer cancel()
 
 	var result hexutil.Bytes
-	err := c.rpc.CallContext(ctxwt, &result, "eth_getCode", account)
+	err := c.rpc.CallContext(ctxwt, &result, "eth_getCode", account, "latest")
 	if err != nil {
 		return "", err
 	}

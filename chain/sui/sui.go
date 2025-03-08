@@ -256,7 +256,7 @@ func (s *SuiAdaptor) GetBlockByRange(req *account.BlockByRangeRequest) (*account
 	panic("implement me")
 }
 
-func (s *SuiAdaptor) CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
+func (s *SuiAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }

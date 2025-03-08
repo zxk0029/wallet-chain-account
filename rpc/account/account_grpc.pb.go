@@ -32,7 +32,7 @@ const (
 	WalletAccountService_SendTx_FullMethodName                    = "/dapplink.account.WalletAccountService/SendTx"
 	WalletAccountService_GetTxByAddress_FullMethodName            = "/dapplink.account.WalletAccountService/getTxByAddress"
 	WalletAccountService_GetTxByHash_FullMethodName               = "/dapplink.account.WalletAccountService/getTxByHash"
-	WalletAccountService_BuildUnSignTransaction_FullMethodName    = "/dapplink.account.WalletAccountService/buildUnSignTransaction"
+	WalletAccountService_BuildUnSignTransaction_FullMethodName    = "/dapplink.account.WalletAccountService/BuildUnSignTransaction"
 	WalletAccountService_BuildSignedTransaction_FullMethodName    = "/dapplink.account.WalletAccountService/buildSignedTransaction"
 	WalletAccountService_DecodeTransaction_FullMethodName         = "/dapplink.account.WalletAccountService/decodeTransaction"
 	WalletAccountService_VerifySignedTransaction_FullMethodName   = "/dapplink.account.WalletAccountService/verifySignedTransaction"
@@ -944,7 +944,7 @@ var WalletAccountService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _WalletAccountService_GetTxByHash_Handler,
 		},
 		{
-			MethodName: "buildUnSignTransaction",
+			MethodName: "BuildUnSignTransaction",
 			Handler:    _WalletAccountService_BuildUnSignTransaction_Handler,
 		},
 		{

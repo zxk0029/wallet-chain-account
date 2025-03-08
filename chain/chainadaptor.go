@@ -16,7 +16,7 @@ type IChainAdaptor interface {
 	GetTxByAddress(req *account.TxAddressRequest) (*account.TxAddressResponse, error)
 	GetTxByHash(req *account.TxHashRequest) (*account.TxHashResponse, error)
 	GetBlockByRange(req *account.BlockByRangeRequest) (*account.BlockByRangeResponse, error)
-	CreateUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error)
+	BuildUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error)
 	BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error)
 	DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error)
 	VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error)
