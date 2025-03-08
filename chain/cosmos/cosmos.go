@@ -259,21 +259,13 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 	list := make([]*account.TxMessage, 0, len(txs))
 
 	for i := 0; i < len(txs); i++ {
-		fromList := make([]*account.Address, 0, len(txs[i].From))
-		for j := 0; j < len(txs[i].From); j++ {
-			fromList = append(fromList, &account.Address{Address: txs[i].From[j]})
-		}
-		toList := make([]*account.Address, 0, len(txs[i].To))
-		for j := 0; j < len(txs[i].To); j++ {
-			toList = append(toList, &account.Address{Address: txs[i].To[j]})
-		}
 		list = append(list, &account.TxMessage{
 			Hash:   txs[i].TxId,
-			Froms:  fromList,
-			Tos:    toList,
+			From:   txs[0].From[0],
+			To:     txs[0].To[0],
 			Fee:    txs[i].TxFee,
 			Status: account.TxStatus_Success,
-			Values: []*account.Value{{Value: txs[i].Value}},
+			Value:  txs[i].Value,
 			Type:   1,
 			Height: txs[i].Height,
 		})
@@ -314,7 +306,6 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 		}
 	}
 
-	values := []*account.Value{{Value: amount}}
 	index, _ := strconv.ParseUint(msgIndex, 10, 32)
 	return &account.TxHashResponse{
 		Code: common2.ReturnCode_SUCCESS,
@@ -322,9 +313,9 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 		Tx: &account.TxMessage{
 			Hash:            txResult.GetTxResponse().TxHash,
 			Index:           uint32(index),
-			Froms:           []*account.Address{{Address: fromAddr}},
-			Tos:             []*account.Address{{Address: toAddr}},
-			Values:          values,
+			From:            fromAddr,
+			To:              toAddr,
+			Value:           amount,
 			Fee:             strconv.FormatInt(txResult.GetTxResponse().GasUsed, 10),
 			Status:          account.TxStatus_Success,
 			Type:            0,

@@ -343,11 +343,11 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 		for i := 0; i < len(txs); i++ {
 			list = append(list, &account.TxMessage{
 				Hash:   txs[i].TxId,
-				Tos:    []*account.Address{{Address: txs[i].To}},
-				Froms:  []*account.Address{{Address: txs[i].From}},
+				To:     txs[i].To,
+				From:   txs[i].From,
 				Fee:    txs[i].TxId,
 				Status: account.TxStatus_Success,
-				Values: []*account.Value{{Value: txs[i].Amount}},
+				Value:  txs[i].Amount,
 				Type:   1,
 				Height: txs[i].Height,
 			})
@@ -409,12 +409,6 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 		beforeTokenAddress = common.Address{}.String()
 		beforeValue = tx.Value()
 	}
-	var fromAddrs []*account.Address
-	var toAddrs []*account.Address
-	var valueList []*account.Value
-	fromAddrs = append(fromAddrs, &account.Address{Address: ""})
-	toAddrs = append(toAddrs, &account.Address{Address: beforeToAddress})
-	valueList = append(valueList, &account.Value{Value: beforeValue.String()})
 	var txStatus account.TxStatus
 	if receipt.Status == 1 {
 		txStatus = account.TxStatus_Success
@@ -427,9 +421,9 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 		Tx: &account.TxMessage{
 			Hash:            tx.Hash().Hex(),
 			Index:           uint32(receipt.TransactionIndex),
-			Froms:           fromAddrs,
-			Tos:             toAddrs,
-			Values:          valueList,
+			From:            beforeTokenAddress,
+			To:              beforeToAddress,
+			Value:           beforeValue.String(),
 			Fee:             tx.GasFeeCap().String(),
 			Status:          txStatus,
 			Type:            0,

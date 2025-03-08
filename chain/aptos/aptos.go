@@ -461,16 +461,13 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 		} else {
 			totalFee = tx.GasUsed * tx.GasUnitPrice
 		}
-		fromAddr := &account.Address{
-			Address: tx.Sender,
-		}
 		txMessage := &account.TxMessage{
-			Hash:  tx.Hash,
-			Froms: []*account.Address{fromAddr},
+			Hash: tx.Hash,
+			From: tx.Sender,
 			//TODO to
-			Tos: []*account.Address{},
+			To: "",
 			//TODO Value
-			Values: []*account.Value{},
+			Value:  strconv.Itoa(0),
 			Fee:    strconv.FormatUint(totalFee, 10),
 			Status: txStatus,
 			Type:   0,
@@ -519,17 +516,11 @@ func (c *ChainAdaptor) GetTxByHash(req *account.TxHashRequest) (*account.TxHashR
 	totalFee := CalculateGasFee(tx.GasUnitPrice, feeStatement.TotalChargeGasUnits, feeStatement.StorageFeeOctas, feeStatement.StorageFeeRefundOctas)
 
 	txMessage := &account.TxMessage{
-		Hash:  tx.Hash,
-		Index: uint32(tx.SequenceNumber),
-		Froms: []*account.Address{{
-			Address: tx.Sender,
-		}},
-		Tos: []*account.Address{{
-			Address: tx.Payload.Arguments[0].(string),
-		}},
-		Values: []*account.Value{{
-			Value: tx.Payload.Arguments[1].(string),
-		}},
+		Hash:   tx.Hash,
+		Index:  uint32(tx.SequenceNumber),
+		From:   tx.Sender,
+		To:     tx.Payload.Arguments[0].(string),
+		Value:  tx.Payload.Arguments[1].(string),
 		Fee:    strconv.FormatUint(totalFee, 10),
 		Status: txStatus,
 		Type:   determineTransactionType(tx.Payload.Function),
