@@ -82,6 +82,7 @@ func TestChainAdaptor_ValidAddress(t *testing.T) {
 	if err != nil {
 		t.Error("valid address failed:", err)
 	}
+	t.Logf("Code：%s", resp.Code)
 	assert.Equal(t, common.ReturnCode_SUCCESS, resp.Code)
 	assert.True(t, resp.Valid)
 

@@ -83,9 +83,14 @@ func (c ChainAdaptor) ConvertAddress(req *account.ConvertAddressRequest) (*accou
 }
 
 func (c ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.ValidAddressResponse, error) {
+	// TODO: The `code` field is not showing in the response when it's set to ReturnCode_SUCCESS (0)
+	// This is due to protobuf's default behavior of omitting fields with default values
+	// To fix this, we need to:
+	// 1. Modify the protobuf definition to force showing the field using `[(gogoproto.jsontag) = "code"]`
+	// 2. Or handle this behavior in the client side by treating missing code as SUCCESS
 	if len(req.Address) != 42 || !strings.HasPrefix(req.Address, "0x") {
 		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
+			Code:  common2.ReturnCode_ERROR,
 			Msg:   "invalid address",
 			Valid: false,
 		}, nil
@@ -94,16 +99,15 @@ func (c ChainAdaptor) ValidAddress(req *account.ValidAddressRequest) (*account.V
 	if ok {
 		return &account.ValidAddressResponse{
 			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address",
+			Msg:   "valid address",
 			Valid: true,
 		}, nil
-	} else {
-		return &account.ValidAddressResponse{
-			Code:  common2.ReturnCode_SUCCESS,
-			Msg:   "invalid address",
-			Valid: false,
-		}, nil
 	}
+	return &account.ValidAddressResponse{
+		Code:  common2.ReturnCode_ERROR,
+		Msg:   "invalid address format",
+		Valid: false,
+	}, nil
 }
 
 func (c ChainAdaptor) GetBlockByNumber(req *account.BlockNumberRequest) (*account.BlockResponse, error) {
@@ -683,7 +687,16 @@ type VerifyTransactionRequestWrapper struct {
 }
 
 // VerifySignedTransaction verifies the signature of a transaction
-// The signature field should be in the format: "txHash:signature",The normal procedure should be to modify the VerifyTransactionRequest in the proto.
+// TODO: Currently the signature field combines both txHash and signature in format "txHash:signature"
+// This is a temporary solution and should be improved by:
+//  1. Modifying the protobuf definition of VerifyTransactionRequest to add a separate txHash field
+//  2. Update the proto file to include:
+//     message VerifyTransactionRequest {
+//     string public_key = 1;
+//     string signature = 2;
+//     string tx_hash = 3;  // New field
+//     }
+//  3. This will make the API more clear and maintainable
 func (c ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
 	if req == nil {
 		return &account.VerifyTransactionResponse{
