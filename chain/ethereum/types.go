@@ -6,7 +6,7 @@ type Eip1559DynamicFeeTx struct {
 	FromAddress string `json:"from_address"`
 	ToAddress   string `json:"to_address"`
 	GasLimit    uint64 `json:"gas_limit"`
-	Gas         uint64 `json:"Gas"`
+	Gas         uint64 `json:"gas"`
 
 	MaxFeePerGas         string `json:"max_fee_per_gas"`
 	MaxPriorityFeePerGas string `json:"max_priority_fee_per_gas"`

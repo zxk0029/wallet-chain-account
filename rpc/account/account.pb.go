@@ -4657,7 +4657,7 @@ var file_dapplink_account_proto_depIdxs = []int32{
 	24, // 37: dapplink.account.WalletAccountService.SendTx:input_type -> dapplink.account.SendTxRequest
 	26, // 38: dapplink.account.WalletAccountService.getTxByAddress:input_type -> dapplink.account.TxAddressRequest
 	28, // 39: dapplink.account.WalletAccountService.getTxByHash:input_type -> dapplink.account.TxHashRequest
-	30, // 40: dapplink.account.WalletAccountService.BuildUnSignTransaction:input_type -> dapplink.account.UnSignTransactionRequest
+	30, // 40: dapplink.account.WalletAccountService.buildUnSignTransaction:input_type -> dapplink.account.UnSignTransactionRequest
 	32, // 41: dapplink.account.WalletAccountService.buildSignedTransaction:input_type -> dapplink.account.SignedTransactionRequest
 	36, // 42: dapplink.account.WalletAccountService.decodeTransaction:input_type -> dapplink.account.DecodeTransactionRequest
 	34, // 43: dapplink.account.WalletAccountService.verifySignedTransaction:input_type -> dapplink.account.VerifyTransactionRequest
@@ -4681,7 +4681,7 @@ var file_dapplink_account_proto_depIdxs = []int32{
 	25, // 61: dapplink.account.WalletAccountService.SendTx:output_type -> dapplink.account.SendTxResponse
 	27, // 62: dapplink.account.WalletAccountService.getTxByAddress:output_type -> dapplink.account.TxAddressResponse
 	29, // 63: dapplink.account.WalletAccountService.getTxByHash:output_type -> dapplink.account.TxHashResponse
-	31, // 64: dapplink.account.WalletAccountService.BuildUnSignTransaction:output_type -> dapplink.account.UnSignTransactionResponse
+	31, // 64: dapplink.account.WalletAccountService.buildUnSignTransaction:output_type -> dapplink.account.UnSignTransactionResponse
 	33, // 65: dapplink.account.WalletAccountService.buildSignedTransaction:output_type -> dapplink.account.SignedTransactionResponse
 	37, // 66: dapplink.account.WalletAccountService.decodeTransaction:output_type -> dapplink.account.DecodeTransactionResponse
 	35, // 67: dapplink.account.WalletAccountService.verifySignedTransaction:output_type -> dapplink.account.VerifyTransactionResponse
