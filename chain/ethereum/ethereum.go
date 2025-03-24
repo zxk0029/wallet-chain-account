@@ -120,8 +120,10 @@ func (c *ChainAdaptor) GetBlockHeaderByNumber(req *account.BlockHeaderNumberRequ
 		}, nil
 	}
 
+	log.Info("get block success", "blockInf", blockInfo, "Number", blockInfo.Number.String(), "Hash", blockInfo.Hash().Hex(), "ParentHash", blockInfo.ParentHash.String())
+
 	blockHead := &account.BlockHeader{
-		Hash:             blockInfo.Hash().String(),
+		Hash:             blockInfo.Hash().Hex(),
 		ParentHash:       blockInfo.ParentHash.String(),
 		UncleHash:        blockInfo.UncleHash.String(),
 		CoinBase:         blockInfo.Coinbase.String(),
