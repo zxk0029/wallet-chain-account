@@ -139,7 +139,7 @@ func TestCosmos_GetBlockByRange(t *testing.T) {
 	fmt.Println("response", response)
 }
 
-func TestCosmos_BuildUnSignTransaction(t *testing.T) {
+func TestCosmos_BuildUnSignTransaction1(t *testing.T) {
 	txStruct := &TxStructure{
 		ChainId:         "cosmoshub-4",
 		FromAddress:     "",

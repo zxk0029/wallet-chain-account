@@ -372,7 +372,6 @@ func (c *ChainAdaptor) SendTx(req *account.SendTxRequest) (*account.SendTxRespon
 		}, nil
 	}
 	log.Info("2:", req.RawTx)
-	// Send the transaction
 	txHash, err := c.solCli.SendTransaction(req.RawTx, nil)
 	if err != nil {
 		log.Error("Failed to send transaction", "err", err)
@@ -718,34 +717,23 @@ func organizeTransactionsByBlock(txResults []*TransactionResult) ([]*account.Blo
 }
 
 func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequest) (*account.UnSignTransactionResponse, error) {
-	// Decode the base64 transaction string
 	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
 	if err != nil {
 		log.Error("Failed to decode base64 string", "err", err)
 		return nil, err
 	}
-
-	// Unmarshal JSON into TxStructure
 	var data TxStructure
 	if err := json.Unmarshal(jsonBytes, &data); err != nil {
 		log.Error("Failed to parse JSON", "err", err)
 		return nil, err
 	}
+	value, _ := strconv.ParseUint(data.Value, 10, 64)
 
-	// Parse the value from string to float
-	valueFloat, err := strconv.ParseFloat(data.Value, 64)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse value: %w", err)
-	}
-	value := uint64(valueFloat * 1000000000)
-
-	// Convert from address to public key
 	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to address to public key
 	toPubkey, err := solana.PublicKeyFromBase58(data.ToAddress)
 	if err != nil {
 		return nil, err
@@ -753,7 +741,6 @@ func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequ
 
 	var tx *solana.Transaction
 	if isSOLTransfer(data.ContractAddress) {
-		// Create a new SOL transfer transaction
 		tx, err = solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
@@ -766,35 +753,31 @@ func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequ
 			solana.TransactionPayer(fromPubkey),
 		)
 	} else {
-		// Handle SPL token transfer
 		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
-
 		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			fromPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find associated token address: %w", err)
+			return nil, fmt.Errorf("failed to find associated token address: %w", err)
 		}
-
 		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			toPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find associated token address: %w", err)
+			return nil, fmt.Errorf("failed to find associated token address: %w", err)
 		}
 
-		//tokenInfo, err := c.sdkClient.GetTokenSupply(context.Background(), mintPubkey, rpc.CommitmentFinalized)
 		tokenInfo, err := GetTokenSupply(c.sdkClient, mintPubkey)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get token info: %w", err)
+			return nil, fmt.Errorf("failed to get token info: %w", err)
 		}
 		decimals := tokenInfo.Value.Decimals
 
 		valueFloat, err := strconv.ParseFloat(data.Value, 64)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse value: %w", err)
+			return nil, fmt.Errorf("failed to parse value: %w", err)
 		}
 		actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
 
@@ -806,11 +789,9 @@ func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequ
 			[]solana.PublicKey{},
 		).Build()
 
-		//accountInfo, err := c.sdkClient.GetAccountInfo(context.Background(), toTokenAccount)
 		accountInfo, err := GetAccountInfo(c.sdkClient, toTokenAccount)
 
 		if err != nil || accountInfo.Value == nil {
-			// Create associated token account if it doesn't exist
 			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
 				fromPubkey,
 				toPubkey,
@@ -823,7 +804,6 @@ func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequ
 				solana.TransactionPayer(fromPubkey),
 			)
 		} else {
-			// Directly create transfer transaction
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
@@ -832,49 +812,38 @@ func (c *ChainAdaptor) BuildUnSignTransaction(req *account.UnSignTransactionRequ
 		}
 	}
 
-	// Log the transaction details
 	log.Info("Transaction:", tx.String())
 
-	// Serialize the transaction message
 	txm, _ := tx.Message.MarshalBinary()
 	signingMessageHex := hex.EncodeToString(txm)
 
-	// Return the unsigned transaction response
 	return &account.UnSignTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
 		Msg:      "Successfully created unsigned transaction",
 		UnSignTx: signingMessageHex,
 	}, nil
 }
+
 func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionRequest) (*account.SignedTransactionResponse, error) {
-	// Decode the base64 transaction string
 	jsonBytes, err := base64.StdEncoding.DecodeString(req.Base64Tx)
 	if err != nil {
 		log.Error("Failed to decode base64 string", "err", err)
 		return nil, err
 	}
 
-	// Unmarshal JSON into TxStructure
 	var data TxStructure
 	if err := json.Unmarshal(jsonBytes, &data); err != nil {
 		log.Error("Failed to parse JSON", "err", err)
 		return nil, err
 	}
 
-	// Parse the value from string to float
-	valueFloat, err := strconv.ParseFloat(data.Value, 64)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse value: %w", err)
-	}
-	value := uint64(valueFloat * 1000000000)
+	value, _ := strconv.ParseUint(data.Value, 10, 64)
 
-	// Convert from address to public key
 	fromPubkey, err := solana.PublicKeyFromBase58(data.FromAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to address to public key
 	toPubkey, err := solana.PublicKeyFromBase58(data.ToAddress)
 	if err != nil {
 		return nil, err
@@ -882,7 +851,6 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 
 	var tx *solana.Transaction
 	if isSOLTransfer(data.ContractAddress) {
-		// Create a new SOL transfer transaction
 		tx, err = solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
@@ -895,15 +863,13 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 			solana.TransactionPayer(fromPubkey),
 		)
 	} else {
-		// Handle SPL token transfer
 		mintPubkey := solana.MustPublicKeyFromBase58(data.ContractAddress)
-
 		fromTokenAccount, _, err := solana.FindAssociatedTokenAddress(
 			fromPubkey,
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find associated token address: %w", err)
+			return nil, fmt.Errorf("failed to find associated token address: %w", err)
 		}
 
 		toTokenAccount, _, err := solana.FindAssociatedTokenAddress(
@@ -911,19 +877,18 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 			mintPubkey,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find associated token address: %w", err)
+			return nil, fmt.Errorf("failed to find associated token address: %w", err)
 		}
 
-		//tokenInfo, err := c.sdkClient.GetTokenSupply(context.Background(), mintPubkey, rpc.CommitmentFinalized)
 		tokenInfo, err := GetTokenSupply(c.sdkClient, mintPubkey)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get token info: %w", err)
+			return nil, fmt.Errorf("failed to get token info: %w", err)
 		}
 		decimals := tokenInfo.Value.Decimals
 
 		valueFloat, err := strconv.ParseFloat(data.Value, 64)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse value: %w", err)
+			return nil, fmt.Errorf("failed to parse value: %w", err)
 		}
 		actualValue := uint64(valueFloat * math.Pow10(int(decimals)))
 
@@ -934,24 +899,19 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 			fromPubkey,
 			[]solana.PublicKey{},
 		).Build()
-		//accountInfo, err := c.sdkClient.GetAccountInfo(context.Background(), toTokenAccount)
 		accountInfo, err := GetAccountInfo(c.sdkClient, toTokenAccount)
-
 		if err != nil || accountInfo.Value == nil {
-			// Create associated token account if it doesn't exist
 			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
 				fromPubkey,
 				toPubkey,
 				mintPubkey,
 			).Build()
-
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{createATAInstruction, transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
 				solana.TransactionPayer(fromPubkey),
 			)
 		} else {
-			// Directly create transfer transaction
 			tx, err = solana.NewTransaction(
 				[]solana.Instruction{transferInstruction},
 				solana.MustHashFromBase58(data.Nonce),
@@ -959,45 +919,37 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 			)
 		}
 	}
-
-	// Ensure the Signatures slice is initialized
 	if len(tx.Signatures) == 0 {
 		tx.Signatures = make([]solana.Signature, 1)
 	}
 
-	// Decode the signature from hex
 	signatureBytes, err := hex.DecodeString(data.Signature)
 	if err != nil {
 		log.Error("Failed to decode hex signature", "err", err)
 	}
 
-	// Verify the signature length
 	if len(signatureBytes) != 64 {
 		log.Error("Invalid signature length", "length", len(signatureBytes))
 	}
 
-	// Convert to Solana Signature
 	var solanaSig solana.Signature
 	copy(solanaSig[:], signatureBytes)
 
-	// Set the signature
 	tx.Signatures[0] = solanaSig
 
-	// Dump the transaction for debugging
 	spew.Dump(tx)
 	if err := tx.VerifySignatures(); err != nil {
 		log.Info("Invalid signatures", "err", err)
 	}
 
-	// Serialize the transaction
 	serializedTx, err := tx.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to serialize transaction: %w", err)
 	}
 
-	// Encode the serialized transaction to base58
+	log.Info("serialized transaction", "serializedTx", serializedTx)
+
 	base58Tx := base58.Encode(serializedTx)
-	//base64Tx := base64.StdEncoding.EncodeToString(serializedTx)
 	return &account.SignedTransactionResponse{
 		Code:     common2.ReturnCode_SUCCESS,
 		Msg:      "Successfully created signed transaction",
@@ -1006,12 +958,10 @@ func (c ChainAdaptor) BuildSignedTransaction(req *account.SignedTransactionReque
 }
 
 func (c *ChainAdaptor) DecodeTransaction(req *account.DecodeTransactionRequest) (*account.DecodeTransactionResponse, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionRequest) (*account.VerifyTransactionResponse, error) {
-
 	txBytes, err := base58.Decode(req.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode transaction: %w", err)
@@ -1039,7 +989,6 @@ func (c *ChainAdaptor) VerifySignedTransaction(req *account.VerifyTransactionReq
 }
 
 func (c *ChainAdaptor) GetExtraData(req *account.ExtraDataRequest) (*account.ExtraDataResponse, error) {
-	//TODO implement me
 	panic("implement me")
 }
 
@@ -1048,21 +997,17 @@ func (c *ChainAdaptor) GetNftListByAddress(req *account.NftAddressRequest) (*acc
 }
 
 func isSOLTransfer(coinAddress string) bool {
-
 	return coinAddress == "" ||
 		coinAddress == "So11111111111111111111111111111111111111112"
 }
+
 func getPrivateKey(keyStr string) (solana.PrivateKey, error) {
-	// base58
 	if prikey, err := solana.PrivateKeyFromBase58(keyStr); err == nil {
 		return prikey, nil
 	}
-
-	// 16
 	if bytes, err := hex.DecodeString(keyStr); err == nil {
 		return solana.PrivateKey(bytes), nil
 	}
-
 	return nil, fmt.Errorf("invalid private key format")
 }
 
@@ -1070,9 +1015,6 @@ func validateChainAndNetwork(chain, network string) (bool, string) {
 	if chain != ChainName {
 		return false, "invalid chain"
 	}
-	//if network != NetworkMainnet && network != NetworkTestnet {
-	//	return false, "invalid network"
-	//}
 	return true, ""
 }
 
