@@ -350,7 +350,7 @@ func (c *ChainAdaptor) GetTxByAddress(req *account.TxAddressRequest) (*account.T
 				Hash:   txs[i].TxId,
 				To:     txs[i].To,
 				From:   txs[i].From,
-				Fee:    txs[i].TxId,
+				Fee:    txs[i].TxFee,
 				Status: account.TxStatus_Success,
 				Value:  txs[i].Amount,
 				Type:   1,
